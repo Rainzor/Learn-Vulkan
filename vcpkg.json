@@ -1,0 +1,12 @@
+{
+  "dependencies": [
+    "glfw3",
+    "glm",
+    "stb",
+    "imgui",
+    "tinyexr",
+    "assimp",
+    "zlib",
+    "tbb"
+  ]
+}
