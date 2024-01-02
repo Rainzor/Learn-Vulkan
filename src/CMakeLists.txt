@@ -62,3 +62,4 @@ endfunction ()
 
 add_src(00_base_code)
 add_src(01_instance_creation)
+add_src(02_validation_layers)
