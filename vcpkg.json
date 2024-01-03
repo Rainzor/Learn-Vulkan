@@ -2,6 +2,7 @@
   "dependencies": [
     "glfw3",
     "glm",
+    "pkgconf",
     "stb",
     "tinyobjloader"
   ]

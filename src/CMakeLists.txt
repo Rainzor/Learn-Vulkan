@@ -60,7 +60,4 @@ function (add_src SRC_NAME)
 
 endfunction ()
 
-add_src(00_base_code)
-add_src(01_instance_creation)
-add_src(02_validation_layers)
-add_src(03_physical_device_selection)
+add_subdirectory(drawing_triangle)

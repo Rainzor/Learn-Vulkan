@@ -1,12 +1,7 @@
 /*
-校验层常被用来做下面的工作：
-• 检测参数值是否合法
-• 追踪对象的创建和清除操作，发现资源泄漏问题
-• 追踪调用来自的线程，检测是否线程安全。
-• 将扁扐扉调用和调用的参数写入日志
-• 追调用进行分析和回放
+    *   逻辑设备是编程层面上用来与物理设备交互的对象，
+    *   关于分配显存、创建Vulkan相关对象的命令大都会被提交给逻辑设备。
 */
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -15,7 +10,8 @@
 #include <vector>
 #include <cstring>
 #include <cstdlib>
-
+#include <optional>
+#include <map>
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 const std::vector<const char*> validationLayers = {
@@ -48,6 +44,20 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
+//队列族索引
+struct QueueFamilyIndices {
+    std::optional<uint32_t> graphicsFamily;//图形队列族索引
+    // std::optional<uint32_t> computeFamily;//计算队列族索引
+    // std::optional<uint32_t> transferFamily;//传输队列族索引
+    // std::optional<uint32_t> sparseBindingFamily;//稀疏绑定队列族索引
+    // std::optional<uint32_t> protectedFamily;//保护队列族索引
+
+    //检查队列族是否支持VK_QUEUE_GRAPHICS_BIT
+    bool isComplete() {
+        return graphicsFamily.has_value();
+    }
+};
+
 class HelloTriangleApplication {
 public:
     void run() {
@@ -59,8 +69,14 @@ public:
 
 private:
     GLFWwindow* window;//窗口句柄   
+    
     VkInstance instance;//实例句柄
     VkDebugUtilsMessengerEXT debugMessenger;//调试信息句柄
+
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;//物理设备句柄,用于获取GPU信息,在cleanup中自动销毁
+    VkDevice device;//逻辑设备句柄,用于和物理设备交互
+
+    VkQueue graphicsQueue;//图形队列句柄
 private:
     void initWindow() {
         glfwInit();//初始化GLFW
@@ -75,11 +91,14 @@ private:
         // initialize the Vulkan library by creating an instance
         createInstance();
 
-        // setup debug messenger instance
+        // 配置调试信息
         setupDebugMessenger();
 
         // 选择物理设备
         pickPhysicalDevice();
+
+        // 逻辑设备
+        createLogicalDevice();
 
     }
 
@@ -90,6 +109,9 @@ private:
     }
 
     void cleanup() {
+
+        vkDestroyDevice(device, nullptr);//销毁逻辑设备
+
         if(enableValidationLayers) {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);//销毁调试信息
         }
@@ -99,6 +121,8 @@ private:
         glfwTerminate();//终止GLFW
 
     }
+
+    // 创建实例
     void createInstance(){
 
         //  check validation layer support by LunarG
@@ -181,6 +205,162 @@ private:
         }
     }
 
+    // 选择物理设备
+    void pickPhysicalDevice(){
+        // 1. 列出所有可用的物理设备
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);//获取可用的物理设备数量
+        if (deviceCount == 0) {
+            throw std::runtime_error("failed to find GPUs with Vulkan support!");
+        }
+        // 2. 获取所有可用的物理设备
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());//获取所有可用的物理设备
+
+        // 3. 按照是否符合要求的特性，选出第一个可用的物理设备
+        for (const auto& device : devices) {
+            if (isDeviceSuitable(device)) {
+                physicalDevice = device;
+                break;
+            }
+        }
+
+        // 3. 按照优先级，选择最佳的物理设备
+        // std::multimap<int, VkPhysicalDevice> candidates;
+        // for(const auto& device : devices) {
+        //     int score = rateDeviceSuitability(device);
+        //     candidates.insert(std::make_pair(score, device));
+        // }
+
+        // if(candidates.rbegin()->first > 0) {
+        //     physicalDevice = candidates.rbegin()->second;
+        // } else {
+        //     throw std::runtime_error("failed to find a suitable GPU!");
+        // }
+
+        // 4. 检查物理设备是否可用
+        if (physicalDevice == VK_NULL_HANDLE) {
+            throw std::runtime_error("failed to find a suitable GPU!");
+        }
+    }
+    
+    // 创建逻辑设备
+    void createLogicalDevice(){
+        // 1. 获取队列族索引
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+        // 2. 配置队列信息
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();//队列族索引
+        queueCreateInfo.queueCount = 1;//队列族中队列数量
+
+        float queuePriority = 1.0f;//队列优先级
+        queueCreateInfo.pQueuePriorities = &queuePriority;//队列优先级
+
+        VkPhysicalDeviceFeatures deviceFeatures{};//物理设备特性
+
+        // 3. 配置逻辑设备信息
+        VkDeviceCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+        createInfo.pQueueCreateInfos = &queueCreateInfo;//队列信息
+        createInfo.queueCreateInfoCount = 1;
+
+        createInfo.pEnabledFeatures = &deviceFeatures;
+
+        createInfo.enabledExtensionCount = 0;
+
+        if(enableValidationLayers) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());//启用的校验层数量
+            createInfo.ppEnabledLayerNames = validationLayers.data();//启用的校验层名称
+        } else {
+            createInfo.enabledLayerCount = 0;
+        }
+
+        // 4. 创建逻辑设备
+        if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create logical device!");
+        }
+
+        // 根据逻辑设备和队列族索引，获取队列句柄 graphicsQueue
+        vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+    
+    }
+
+    // 检查物理设备是否可用
+     bool isDeviceSuitable(VkPhysicalDevice device) {
+        QueueFamilyIndices indices = findQueueFamilies(device);
+
+        return indices.isComplete();
+    }
+
+    // 队列族索引
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device){
+        QueueFamilyIndices indices;
+
+        // 1. 获取所有队列族
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);//获取队列族数量
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());//获取队列族属性
+
+        // 2. 找出支持某种功能的队列族
+        int i = 0;
+        for (const auto& queueFamily : queueFamilies) {
+            // 检查队列族是否支持图形指令
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                indices.graphicsFamily = i;
+            }
+            // // 检查队列族是否支持VK_QUEUE_COMPUTE_BIT
+            // if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
+            //     indices.computeFamily = i;
+            // }
+            // // 检查队列族是否支持VK_QUEUE_TRANSFER_BIT
+            // if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+            //     indices.transferFamily = i;
+            // }
+            // // 检查队列族是否支持VK_QUEUE_SPARSE_BINDING_BIT
+            // if (queueFamily.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) {
+            //     indices.sparseBindingFamily = i;
+            // }
+            // // 检查队列族是否支持VK_QUEUE_PROTECTED_BIT
+            // if (queueFamily.queueFlags & VK_QUEUE_PROTECTED_BIT) {
+            //     indices.protectedFamily = i;
+            // }
+
+            // 要求的属性是否检查完毕
+            if (indices.isComplete()) {
+                break;
+            }
+
+            i++;
+        }
+
+        return indices;
+    }
+
+    // 对物理设备进行打分
+    int rateDeviceSuitability(VkPhysicalDevice device) {
+        int score = 0;
+        // 1. 基础信息
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);//获取物理设备属性
+        // VkPhysicalDeviceFeatures deviceFeatures;
+        // vkGetPhysicalDeviceFeatures(device, &deviceFeatures);//获取物理设备特性
+
+        // 2. 设备类型
+        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+            score += 1000;
+        }
+
+        score += deviceProperties.limits.maxImageDimension2D;
+        if(!deviceProperties.limits.framebufferColorSampleCounts) {
+            return 0;
+        }
+        return score;
+    }
+
     // 获取扩展
     std::vector<const char*> getRequiredExtensions() {
         uint32_t glfwExtensionCount = 0;
@@ -226,14 +406,16 @@ private:
     }
 
     
-    // debug callback
-    // param: messageSeverity 消息级别：诊断、资源创建、警告、错误
-    // param: messageType 消息类型：与性能无关、违反规范的行为或者错误、影响vulkan性能的事件
-    // param: pCallbackData 指向包含消息的结构体: 包含
-    //        pMessage：包含调试信息的字符串
-    //        pObjects：与消息相关的Vulkan对象的句柄数组
-    //        objectCount：pObjects数组中的对象数量
-    // param: pUserData 指向回调函数的用户数据
+    /*
+    debug callback
+    param: messageSeverity 消息级别：诊断、资源创建、警告、错误
+    param: messageType 消息类型：与性能无关、违反规范的行为或者错误、影响vulkan性能的事件
+    param: pCallbackData 指向包含消息的结构体: 包含
+           pMessage：包含调试信息的字符串
+           pObjects：与消息相关的Vulkan对象的句柄数组
+           objectCount：pObjects数组中的对象数量
+    param: pUserData 指向回调函数的用户数据
+    */
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
         VkDebugUtilsMessageTypeFlagsEXT messageType,
