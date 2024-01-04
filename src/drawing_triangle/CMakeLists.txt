@@ -1,8 +1,0 @@
-add_src(00_base_code)
-add_src(01_instance_creation)
-add_src(02_validation_layers)
-add_src(03_physical_device_selection)
-add_src(04_logical_device)
-add_src(05_window_surface)
-add_src(06_swap_chain_creation)
-add_src(07_image_views)

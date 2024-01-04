@@ -1,18 +1,18 @@
 /*
-    * Vulkan Tutorial (https://vulkan-tutorial.com/)
-    *
-    *  - image views
-    *  图像视图描述了访问图像的方式，以及图像的哪一部分可以被访问。
+    Framebuffers: 帧缓冲
 */
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
+#include <algorithm>
 #include <vector>
 #include <cstring>
 #include <cstdlib>
+#include <cstdint>
+#include <limits>
 #include <optional>
 #include <set>
 #include <map>
@@ -56,11 +56,6 @@ struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;//图形队列族索引
     std::optional<uint32_t> presentFamily;//呈现队列族索引
 
-    // std::optional<uint32_t> computeFamily;//计算队列族索引
-    // std::optional<uint32_t> transferFamily;//传输队列族索引
-    // std::optional<uint32_t> sparseBindingFamily;//稀疏绑定队列族索引
-    // std::optional<uint32_t> protectedFamily;//保护队列族索引
-
     //检查队列族是否支持VK_QUEUE_GRAPHICS_BIT
     bool isComplete() {
         return graphicsFamily.has_value() && presentFamily.has_value();
@@ -101,7 +96,11 @@ private:
     VkFormat swapChainImageFormat;//交换链图像格式
     VkExtent2D swapChainExtent;//交换链图像分辨率
     std::vector<VkImageView> swapChainImageViews;//交换链图像视图
+    std::vector<VkFramebuffer> swapChainFramebuffers;//交换链帧缓冲
 
+    VkRenderPass renderPass;//渲染流程句柄
+    VkPipelineLayout pipelineLayout;//管线布局句柄
+    VkPipeline graphicsPipeline;//图形管线句柄
 
 private:
     void initWindow() {
@@ -134,6 +133,16 @@ private:
 
         // 创建交换链图像视图
         createImageViews();
+
+        // 创建渲染流程
+        createRenderPass();
+
+        // 创建图形管线
+        createGraphicsPipeline();
+
+        // 创建帧缓冲
+        createFramebuffers();
+
     }
 
     void mainLoop() {
@@ -143,6 +152,15 @@ private:
     }
 
     void cleanup() {
+        // 销毁交换链帧缓冲
+        for (auto framebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+        }
+
+        vkDestroyPipeline(device , graphicsPipeline , nullptr ) ;//销毁图形管线
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);//销毁管线布局
+        vkDestroyRenderPass(device, renderPass, nullptr);//销毁渲染流程
+
         for (auto imageView : swapChainImageViews) {
             vkDestroyImageView(device, imageView, nullptr);//销毁交换链图像视图
         }
@@ -467,6 +485,254 @@ private:
         }
     }
 
+    // 创建渲染流程
+    void createRenderPass() {
+        VkAttachmentDescription colorAttachment{};
+        colorAttachment.format = swapChainImageFormat;//format成员变量用于指定颜色缓冲附着的格式
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;//指定采样数量
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;//指定渲染前对颜色缓冲的操作：清除
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;//指定渲染后对颜色缓冲的操作：存储
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;//指定渲染后图像的布局：呈现
+
+        //子流程:用于引用多个/一个attachment，处理attachment的内容
+        VkAttachmentReference colorAttachmentRef{};
+        colorAttachmentRef.attachment = 0;//指定颜色缓冲附着的索引
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;//颜色缓冲附着数量
+        subpass.pColorAttachments = &colorAttachmentRef;//对应 layout(location = 0) out vec4 outColor
+
+        //渲染流程
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+
+        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create render pass!");
+        }
+
+    }
+
+    //  创建图形管线
+    void createGraphicsPipeline() {
+        auto vertShaderCode = readFile("../shaders/vert.spv");//顶点着色器
+        auto fragShaderCode = readFile("../shaders/frag.spv");//片段着色器
+
+        // 1. 创建着色器模块
+        VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);//顶点着色器模块
+        VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);//片段着色器模块
+
+        // 2. 配置顶点着色器信息
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;//顶点着色器信息
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;//在顶点着色器阶段使用
+        vertShaderStageInfo.module = vertShaderModule;//顶点着色器模块
+        vertShaderStageInfo.pName = "main";//着色器入口函数名称：可以使用不同的入口函数来实现不同的效果
+        vertShaderStageInfo.pSpecializationInfo = nullptr;//特殊化常量信息
+        // 3. 配置片段着色器信息
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;//片段着色器信息
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;//在片段着色器阶段使用
+        fragShaderStageInfo.module = fragShaderModule;//片段着色器模块
+        fragShaderStageInfo.pName = "main";
+        fragShaderStageInfo.pSpecializationInfo = nullptr;
+
+        // 4. 配置着色器阶段信息
+        VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};//着色器阶段信息
+        
+        // 5. 配置顶点输入信息
+        // 在硬编码中不载入顶点数据，而是在着色器中使用gl_VertexIndex内置变量来获取顶点数据，所以绑定数据置为0
+        // 后面使用顶点缓冲区对象来存储顶点数据是更好的选择
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;//顶点输入信息
+        vertexInputInfo.vertexBindingDescriptionCount = 0;//顶点绑定描述数量
+        vertexInputInfo.pVertexBindingDescriptions = nullptr;//顶点绑定描述
+        vertexInputInfo.vertexAttributeDescriptionCount = 0;//顶点属性描述数量
+        vertexInputInfo.pVertexAttributeDescriptions = nullptr;//顶点属性描述
+
+        // 6. 配置几何图元信息
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;//输入汇总信息
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;//图元拓扑：三角形列表
+        inputAssembly.primitiveRestartEnable = VK_FALSE;//启用图元重启
+
+        // 7. 配置视口信息
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;//视口信息
+        // viewportState.viewportCount = 1;//视口数量
+        // viewportState.pViewports = nullptr;//视口
+        // viewportState.scissorCount = 1;//裁剪数量
+        // viewportState.pScissors = nullptr;//裁剪
+        VkViewport viewport{};
+        viewport.x = 0.0f;//视口x坐标
+        viewport.y = 0.0f;//视口y坐标
+        viewport.width = (float) swapChainExtent.width;//视口宽度
+        viewport.height = (float) swapChainExtent.height;//视口高度
+        viewport.minDepth = 0.0f;//视口最小深度
+        viewport.maxDepth = 1.0f;//视口最大深度
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};//裁剪偏移量
+        scissor.extent = swapChainExtent;//裁剪范围
+        viewportState.viewportCount = 1;//视口数量
+        viewportState.pViewports = &viewport;//视口
+        viewportState.scissorCount = 1;//裁剪数量
+        viewportState.pScissors = &scissor;//裁剪
+
+        // 8. 配置光栅化信息:将来自顶点着色器的顶点构成的几何图元转换为片段交由片段着色器着色
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;//光栅化信息
+        rasterizer.depthClampEnable = VK_FALSE;//启用深度截取:TRUE，超出深度范围的片段会被截取，而不是丢弃
+        rasterizer.rasterizerDiscardEnable = VK_FALSE;//启用光栅化丢弃:TRUE，所有几何图元都会丢弃，生成的片段不会传递给下一阶段、
+        //多边形模式：
+        //VK_POLYGON_MODE_FILL 填充模式，多边形内部都产生片段
+        //VK_POLYGON_MODE_LINE 线框模式，多边形边缘产生片段
+        //VK_POLYGON_MODE_POINT 点模式，多边形顶点产生片段
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 1.0f;//片段线宽
+        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;//剔除模式：背面剔除
+        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;//正面朝向：顺时针
+        rasterizer.depthBiasEnable = VK_FALSE;//启用深度偏移
+
+        // 9. 配置多重采样信息
+        //多重采样是一种组合多个不同多边形产生的片段的颜色来决定最终的像素颜色的技术
+        //它可以一定程度上减少多边形边缘的走样现象。
+        VkPipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;//多重采样信息
+        multisampling.sampleShadingEnable = VK_FALSE;//启用采样阴影
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;//采样数量
+        multisampling.minSampleShading = 1.0f;//最小采样阴影
+        multisampling.pSampleMask = nullptr;//采样掩码
+        multisampling.alphaToCoverageEnable = VK_FALSE;
+        multisampling.alphaToOneEnable = VK_FALSE;
+
+        // 10. 配置颜色混合信息
+        //片段着色器返回的片段颜色需要和原来帧缓冲中对应像素的颜色进行混合。
+        //混合的方式有两种：
+        // - 混合旧值和新值产生最终的颜色
+        // - 使用逻辑位运算组合旧值和新值
+        //下面的代码：片段颜色会直接覆盖原来帧缓冲中存储的颜色值。
+        VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | 
+                                              VK_COLOR_COMPONENT_G_BIT | 
+                                              VK_COLOR_COMPONENT_B_BIT | 
+                                              VK_COLOR_COMPONENT_A_BIT;//颜色写入掩码
+        colorBlendAttachment.blendEnable = VK_FALSE;//不启用混合
+
+        VkPipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;//颜色混合信息
+        colorBlending.logicOpEnable = VK_FALSE;//启用逻辑运算
+        colorBlending.logicOp = VK_LOGIC_OP_COPY;//逻辑运算
+        colorBlending.attachmentCount = 1;//颜色混合附件数量
+        colorBlending.pAttachments = &colorBlendAttachment;//颜色混合附件
+        colorBlending.blendConstants[0] = 0.0f;//混合常量
+        colorBlending.blendConstants[1] = 0.0f;//混合常量
+        colorBlending.blendConstants[2] = 0.0f;//混合常量
+        colorBlending.blendConstants[3] = 0.0f;//混合常量
+
+        // 11. 配置动态状态信息
+        //动态状态是指在绘制过程中可以改变的状态
+        //下面配置了两个动态状态：视口和裁剪矩形
+        std::vector<VkDynamicState> dynamicStates = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR
+        };
+        VkPipelineDynamicStateCreateInfo dynamicState{};
+        dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;//动态状态信息
+        dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+        dynamicState.pDynamicStates = dynamicStates.data();
+
+        // 12. 配置管线布局信息
+        // 配置一些uniform值，它们可以在着色器中使用
+        // uniform值是在绘制过程中可以改变的值,它们可以用来传递变换矩阵和纹理采样器
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;//管线布局信息
+        pipelineLayoutInfo.setLayoutCount = 0;//布局数量
+        pipelineLayoutInfo.pSetLayouts = nullptr;//布局
+        pipelineLayoutInfo.pushConstantRangeCount = 0;//推送常量范围数量
+        pipelineLayoutInfo.pPushConstantRanges = nullptr;//推送常量范围
+
+        // 13. 创建管线布局
+        if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create pipeline layout!");
+        }
+
+        // 14. 配置管线信息
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.pDynamicState = &dynamicState;
+        pipelineInfo.layout = pipelineLayout;
+        pipelineInfo.renderPass = renderPass;
+        pipelineInfo.subpass = 0;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+        if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create graphics pipeline!");
+        }
+
+
+        // 15. 销毁着色器模块
+        vkDestroyShaderModule(device, fragShaderModule, nullptr);//销毁片段着色器模块   
+        vkDestroyShaderModule(device, vertShaderModule, nullptr);//销毁顶点着色器模块
+    }
+
+    // 创建帧缓冲
+    void createFramebuffers() {
+        swapChainFramebuffers.resize(swapChainImageViews.size());
+
+        //为每个交换链图像视图创建帧缓冲
+        for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+            VkImageView attachments[] = {
+                swapChainImageViews[i]
+            };
+
+            VkFramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferInfo.renderPass = renderPass;
+            framebufferInfo.attachmentCount = 1;
+            framebufferInfo.pAttachments = attachments;//attachment 就是渲染流程中的交换链图像
+            framebufferInfo.width = swapChainExtent.width;
+            framebufferInfo.height = swapChainExtent.height;
+            framebufferInfo.layers = 1;
+
+            if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create framebuffer!");
+            }
+        }
+    }
+
+
+
+    // 创建着色器模块：对着色器代码的包装
+    VkShaderModule createShaderModule(const std::vector<char>& code) {
+        // 1. 配置着色器模块信息
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;//着色器模块信息
+        createInfo.codeSize = code.size();//着色器模块大小
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());//着色器模块数据
+
+        // 2. 创建着色器模块
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {//创建着色器模块
+            throw std::runtime_error("failed to create shader module!");
+        }
+
+        return shaderModule;
+    }
 
     // 选择交换链图像格式
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(
@@ -714,6 +980,28 @@ private:
             }
         }
         return true;
+    }
+
+    //读取文件
+    static std::vector<char> readFile(const std::string& filename) {
+        //ate：从文件末尾开始读取
+        //binary：读取二进制文件
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("failed to open file!");
+        }
+
+        size_t fileSize = (size_t) file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        //将文件指针移动到文件开头处，然后读取文件
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+
+        file.close();
+
+        return buffer;
     }
 
     
