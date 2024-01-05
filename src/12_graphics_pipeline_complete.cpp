@@ -1,3 +1,11 @@
+/*
+    * - Graphics pipeline
+    *
+    *   It describes the configurable state of the graphics card, 
+    *   like the viewport size and depth buffer operation and 
+    *   the programmable state using VkShaderModule objects. 
+*/
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -472,7 +480,7 @@ private:
         }
     }
 
-    // 创建渲染流程
+    // 创建渲染流程: 指定了渲染操作的附件类型、数量和质量，以及渲染操作发生的子流程
     void createRenderPass() {
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapChainImageFormat;//format成员变量用于指定颜色缓冲附着的格式
@@ -553,24 +561,10 @@ private:
         // 7. 配置视口信息
         VkPipelineViewportStateCreateInfo viewportState{};
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;//视口信息
-        // viewportState.viewportCount = 1;//视口数量
-        // viewportState.pViewports = nullptr;//视口
-        // viewportState.scissorCount = 1;//裁剪数量
-        // viewportState.pScissors = nullptr;//裁剪
-        VkViewport viewport{};
-        viewport.x = 0.0f;//视口x坐标
-        viewport.y = 0.0f;//视口y坐标
-        viewport.width = (float) swapChainExtent.width;//视口宽度
-        viewport.height = (float) swapChainExtent.height;//视口高度
-        viewport.minDepth = 0.0f;//视口最小深度
-        viewport.maxDepth = 1.0f;//视口最大深度
-        VkRect2D scissor{};
-        scissor.offset = {0, 0};//裁剪偏移量
-        scissor.extent = swapChainExtent;//裁剪范围
         viewportState.viewportCount = 1;//视口数量
-        viewportState.pViewports = &viewport;//视口
+        viewportState.pViewports = nullptr;//视口
         viewportState.scissorCount = 1;//裁剪数量
-        viewportState.pScissors = &scissor;//裁剪
+        viewportState.pScissors = nullptr;//裁剪
 
         // 8. 配置光栅化信息:将来自顶点着色器的顶点构成的几何图元转换为片段交由片段着色器着色
         VkPipelineRasterizationStateCreateInfo rasterizer{};
@@ -663,7 +657,7 @@ private:
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.layout = pipelineLayout;
-        pipelineInfo.renderPass = renderPass;
+        pipelineInfo.renderPass = renderPass;//渲染流程
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 

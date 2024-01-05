@@ -5,7 +5,9 @@
     *    所有状态必须被显式地设置，无论是视口大小，还是使用的颜色混合函数都需要显式地指定。
     * 
     *  - 定义了图形管线的固定功能阶段使用的状态信息，比如输入装配，视口，光栅化，颜色混合
-    * 
+    *   
+    *   createGraphicsPipeline()
+    *   VkPipelineLayout pipelineLayout
 */
 
 #define GLFW_INCLUDE_VULKAN
@@ -636,8 +638,6 @@ private:
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create pipeline layout!");
         }
-
-
 
         // 14. 销毁着色器模块
         vkDestroyShaderModule(device, fragShaderModule, nullptr);//销毁片段着色器模块   

@@ -3,6 +3,19 @@
     1. Acquire an image from the swap chain
     2. Execute the command buffer with that image as attachment in the framebuffer
     3. Return the image to the swap chain for presentation
+
+    Overview of Drawing a Triangle:
+    1. Create a VkInstance
+    2. Select a supported graphics card (VkPhysicalDevice)
+    3. Create a VkDevice and VkQueue for drawing and presentation
+    4. Create a window, window surface and swap chain
+    5. Wrap the swap chain images into VkImageView
+    6. Create a render pass that specifies the render targets and usage
+    7. Create framebuffers for the render pass
+    8. Set up the graphics pipeline
+    9. Allocate and record a command buffer with the draw commands for every possible swap chain image
+    10. Draw frames by acquiring images, submitting the right draw command buffer and 
+        returning the images back to the swap chain
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -608,20 +621,6 @@ private:
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;//视口信息
         viewportState.viewportCount = 1;//视口数量
         viewportState.scissorCount = 1;//裁剪数量
-        // VkViewport viewport{};
-        // viewport.x = 0.0f;//视口x坐标
-        // viewport.y = 0.0f;//视口y坐标
-        // viewport.width = (float) swapChainExtent.width;//视口宽度
-        // viewport.height = (float) swapChainExtent.height;//视口高度
-        // viewport.minDepth = 0.0f;//视口最小深度
-        // viewport.maxDepth = 1.0f;//视口最大深度
-        // VkRect2D scissor{};
-        // scissor.offset = {0, 0};//裁剪偏移量
-        // scissor.extent = swapChainExtent;//裁剪范围
-        // viewportState.viewportCount = 1;//视口数量
-        // viewportState.pViewports = &viewport;//视口
-        // viewportState.scissorCount = 1;//裁剪数量
-        // viewportState.pScissors = &scissor;//裁剪
 
         // 8. 配置光栅化信息:将来自顶点着色器的顶点构成的几何图元转换为片段交由片段着色器着色
         VkPipelineRasterizationStateCreateInfo rasterizer{};
@@ -800,7 +799,7 @@ private:
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass;
-        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];//指定帧缓冲
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = swapChainExtent;
 
@@ -809,7 +808,7 @@ private:
         renderPassInfo.pClearValues = &clearColor;
         //开始渲染流程
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        //绑定管线：
+        //绑定管线：指定要使用的管线对象，以获得管线的状态
         // The second parameter specifies if the pipeline object is a graphics or compute pipeline. 
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
@@ -828,12 +827,16 @@ private:
         scissor.extent = swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+        //*-----------------------------------绑定顶点缓冲区-----------------------------------*//
         //CmdDraw:绘制三角形
+        //参数：
         //vertexCount：指定顶点数量
         //instanceCount：指定实例数量
         //firstVertex：指定顶点偏移量
         //firstInstance：指定实例偏移量
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+        //*----------------------------------------------------------------------------------*//
+
 
         //结束渲染流程
         vkCmdEndRenderPass(commandBuffer);
@@ -862,6 +865,7 @@ private:
         }
 
     }
+    
     // 绘制一帧!!!!!!!!!
     void drawFrame() {
         // 1. 等待上一帧渲染结束
@@ -878,7 +882,7 @@ private:
 
         // 4.记录指令缓冲
         vkResetCommandBuffer(commandBuffer, /*VkCommandBufferResetFlagBits*/ 0);
-        // 记录要提交的指令idx
+        // 记录要提交的指令，进行渲染
         recordCommandBuffer(commandBuffer, imageIndex);
 
         // 5. 提交指令缓冲

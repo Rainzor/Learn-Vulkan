@@ -151,7 +151,7 @@ private:
         createCommandPool() ;
 
         // 创建命令缓冲
-        createCommandBuffers() ;
+        createCommandBuffer() ;
 
     }
 

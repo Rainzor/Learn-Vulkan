@@ -3,10 +3,18 @@
     *
     * - Render passes
     * 
+    * Render passes in Vulkan describe the type of images 
+    * that are used during rendering operations, how they will be used,
+    * and how their contents should be treated.
+    * 
     * - 在进行管线创建之前，我们还需要设置用于渲染的帧缓冲附着。
     *   我们需要指定使用的颜色和深度缓冲，以及采样数，渲染操作如何处理缓冲的内容。
     * 
     * - 定义了被管线使用的附着,附着的用途
+    *   
+    *  createRenderPass()
+    *  VkRenderPass renderPass;//渲染流程句柄
+
 */
 
 #define GLFW_INCLUDE_VULKAN

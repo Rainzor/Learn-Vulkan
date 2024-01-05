@@ -1,5 +1,8 @@
 /*
-    Framebuffers: 帧缓冲
+    *   Framebuffers: 帧缓冲
+    *
+    *   std::vector<VkFramebuffer> swapChainFramebuffers;//交换链帧缓冲
+    *   createFramebuffers: 创建帧缓冲
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -454,7 +457,7 @@ private:
         swapChainExtent = extent;//交换链图像分辨率
     }
     
-    // 创建交换链图像视图
+    // 创建交换链图像视图：用于定义交换链图像的内存布局
     void createImageViews() {
         // 1. 配置交换链图像视图信息
         swapChainImageViews.resize(swapChainImages.size());//分配交换链图像视图内存
@@ -704,7 +707,7 @@ private:
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.renderPass = renderPass;
             framebufferInfo.attachmentCount = 1;
-            framebufferInfo.pAttachments = attachments;//attachment 就是渲染流程中的交换链图像
+            framebufferInfo.pAttachments = attachments;//attachment 就是渲染流程中的交换链视图
             framebufferInfo.width = swapChainExtent.width;
             framebufferInfo.height = swapChainExtent.height;
             framebufferInfo.layers = 1;
@@ -714,8 +717,6 @@ private:
             }
         }
     }
-
-
 
     // 创建着色器模块：对着色器代码的包装
     VkShaderModule createShaderModule(const std::vector<char>& code) {

@@ -8,6 +8,11 @@
     * 
     *   This infrastructure is known as the swap chain and must 
     *   be created explicitly in Vulkan
+    * 
+    *   Its basic purpose is to ensure that the image that we're currently
+    *   rendering to is different from the one that is currently on the screen.
+    *   This is important to make sure that only complete images are shown.
+    * 
 */
 
 #define GLFW_INCLUDE_VULKAN
