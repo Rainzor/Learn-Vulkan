@@ -1,8 +1,15 @@
 /*
     *   Framebuffers: 帧缓冲
-    *
-    *   std::vector<VkFramebuffer> swapChainFramebuffers;//交换链帧缓冲
-    *   createFramebuffers: 创建帧缓冲
+    *   
+    *   a framebuffer specifies the actual image views to bind to render pass attachments
+    * 
+    *   FrameBuffer表示可用作附件(渲染目标)的实际图像的链接。
+    *   通过指定RenderPass和一组Imageview创建一个Framebuffer对象。
+    *   当然，它们的数量和格式必须与RenderPass的规范相匹配。
+    *   Framebuffer是Image之上的另一层，基本上将这些Imageview组合在一起，以便在渲染特定RenderPass期间绑定为附件。
+    *   每当开始渲染RernderPass时，调用函数vkCmdBeginRenderPass并将FrameBuffer传递给它。
+    * 
+    *   createFramebuffers()
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -707,7 +714,7 @@ private:
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.renderPass = renderPass;
             framebufferInfo.attachmentCount = 1;
-            framebufferInfo.pAttachments = attachments;//attachment 就是渲染流程中的交换链视图
+            framebufferInfo.pAttachments = attachments;//attachment 就是渲染流程中的交换链视图ImageViews
             framebufferInfo.width = swapChainExtent.width;
             framebufferInfo.height = swapChainExtent.height;
             framebufferInfo.layers = 1;

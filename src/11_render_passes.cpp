@@ -7,14 +7,31 @@
     * that are used during rendering operations, how they will be used,
     * and how their contents should be treated.
     * 
-    * - 在进行管线创建之前，我们还需要设置用于渲染的帧缓冲附着。
-    *   我们需要指定使用的颜色和深度缓冲，以及采样数，渲染操作如何处理缓冲的内容。
+    * A render pass specifies the types of attachments that will be accessed
     * 
-    * - 定义了被管线使用的附着,附着的用途
+    *   RenderPass 是整个Render Pipeline的一次执行。
+    *   RenderPass 本质是定义一个完整的渲染流程以及使用的所有资源的描述，
+    *   可以理解为是一份元数据或者占位符的概念其中不包含任何真正的数据。
+    * 
+    *   RenderPass 描述了在渲染操作时要使用的图像类型、图像的使用方式以及处理图像的内容的方式。
+    *   在我们完成管线的创建工作之前，我们需要告诉Vulkan渲染时候使用的framebuffer帧缓冲区附件相关信息。
+    *   我们需要指定多少个颜色和深度缓冲区将会被使用，指定多少个采样器被用到及在整个渲染操作中相关的内容如何处理。
+    *   所有的这些信息都被封装在一个叫做 render pass 的对象中。
+    * 
+    *   Subpass 在传统桌面IMR的GPU上，渲染操作是按照顺序执行的，每个渲染操作都会依赖于上一个渲染操作的结果。
+    *   但是在移动设备上，GPU的架构不同，渲染操作可以并行执行，所以需要将渲染操作分成多个子渲染操作。
+    * 
+    * - 定义了被管线使用的 Attachment ,Attachment 的用途
+    * 
+    * - 创建一个渲染过程（RenderPass）来指定渲染目标和渲染目标的使用方法
+        a. 规定附件（颜色附件，深度附件）的性质
+        b. 规定缓冲中样本数Sample。
+        c. 规定样本内容如何处理（loadOp， storeOp）
+
+        RenderPass 是通过Framebuffer中包含的ImageView拿到真正的数据
     *   
     *  createRenderPass()
     *  VkRenderPass renderPass;//渲染流程句柄
-
 */
 
 #define GLFW_INCLUDE_VULKAN
@@ -490,8 +507,9 @@ private:
         }
     }
 
-    // 创建渲染流程
+    // 创建渲染通道
     void createRenderPass() {
+        //颜色缓冲attachment资源的描述
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = swapChainImageFormat;//format成员变量用于指定颜色缓冲附着的格式
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;//指定采样数量
@@ -511,7 +529,7 @@ private:
         subpass.colorAttachmentCount = 1;//颜色缓冲附着数量
         subpass.pColorAttachments = &colorAttachmentRef;//对应 layout(location = 0) out vec4 outColor
 
-        //渲染流程
+        //renderPass 创建
         VkRenderPassCreateInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassInfo.attachmentCount = 1;

@@ -15,7 +15,7 @@
     8. Set up the graphics pipeline
     9. Allocate and record a command buffer with the draw commands for every possible swap chain image
     10. Draw frames by acquiring images, submitting the right draw command buffer and 
-        returning the images back to the swap chain
+        returning the images back to the swap chain for presentation
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -548,7 +548,7 @@ private:
         subpass.pColorAttachments = &colorAttachmentRef;//对应 layout(location = 0) out vec4 outColor
 
         // Denpendencies:用于同步不同subpass之间的操作
-         VkSubpassDependency dependency{};
+        VkSubpassDependency dependency{};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.dstSubpass = 0;
         dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

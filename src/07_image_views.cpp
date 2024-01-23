@@ -2,10 +2,21 @@
     * Vulkan Tutorial (https://vulkan-tutorial.com/)
     *
     *  - image views
-    *  图像视图描述了访问图像的方式，以及图像的哪一部分可以被访问。
-    * An image view is quite literally a view into an image. 
-    * It describes how to access the image and which part of the image to access, 
-    * for example if it should be treated as a 2D texture depth texture without any mipmapping levels.
+    *   图像视图描述了访问图像的方式，以及图像的哪一部分可以被访问。
+    *   An image view is quite literally a view into an image. 
+    *   It describes how to access the image and which part of the image to access, 
+    *   for example if it should be treated as a 2D texture depth texture without any mipmapping levels.
+    * 
+    *   比如，图像可以被图像视图描述为一个没有细化级别的二维深度纹理，进而可以在其上进行与二维深度纹理相关的操作。
+    *   从Swapchain获取图像后，还不能直接在图像上进行绘制，需要将图像先包装为VkImageView和VkFramebuffer。
+    *   图像视图引用图像的特定部分，帧缓冲Framebuff引用图像视图作为颜色，深度和模板目标。
+    * 
+    *   创建交换链后，把交换链里的图像包裹到VkImageView（图像视图）里面:给图像定义一个视图，指定图像的用途和格式。
+        a. 表面格式（像素格式，色彩空间）
+        b. 显示模式（在屏幕上“交换”图像的条件：立即模式，双缓冲，单缓冲）
+        c. 交换范围（交换链中图像的分辨率）
+    * 
+    *   Swapchain中可能有许多不同的图像，可以预先为每个图像都创建好图像视图和帧缓冲，然后在绘制时选择对应的视图或帧缓冲。
     * 
     *   std::vector<VkImageView> swapChainImageViews
 */

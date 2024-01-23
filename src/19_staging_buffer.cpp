@@ -1,25 +1,13 @@
 /*
-    *   Vertex Buffer
-    *
-    *   Buffers in Vulkan are regions of memory used for storing arbitrary data 
-    *   that can be read by the graphics card.
+    *  Staging Buffer
+    *  使用一个缓冲区来存储顶点数据，然后将数据拷贝到顶点缓冲区对象中
+    *  避免了直接从CPU内存拷贝到GPU内存，提高了性能
     * 
-    *   Buffers在Vulkan中是用于存储GPU可以读取的任意数据的内存区域。
+    *   作用：作为CPU和GPU传递数据的中间站，将数据从CPU内存拷贝到缓冲区，再从缓冲区拷贝到GPU内存
     * 
-    *   Overview of vertex class:
-    * 1.  define the class members
-    * 2.    getBindingDescription: 用来描述组成array的vertices
-    * 3.    getAttributeDescriptions: 用来描述如何处理每个顶点数据
-    * 
-    *   Overview of add vertex buffer:
-    * 1.  Create a buffer
-    * 2.  Allocate memory to buffer
-    * 3.  Bind memory to buffer
-    * 4.  Copy data to buffer
-    * 5.  Bind buffer to VkPipeline
-    * 6.  Draw
-    * 
-    * 
+    * createVertexBuffer()
+    * createBuffer()
+    * copyBuffer()
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -900,50 +888,102 @@ private:
         }
     }
 
-    // 创建顶点缓冲区
     void createVertexBuffer() {
+        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        //VK_BUFFER_USAGE_TRANSFER_SRC_BIT：缓冲区可以用作内存传输操作的源
+        //VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT：CPU可访问
+        //VK_MEMORY_PROPERTY_HOST_COHERENT_BIT：CPU内存一致
+        createBuffer(bufferSize, 
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                    stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, vertices.data(), (size_t) bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        //VK_BUFFER_USAGE_TRANSFER_DST_BIT：缓冲区可以用作内存传输操作的目标
+        //VK_BUFFER_USAGE_VERTEX_BUFFER_BIT：缓冲区可以用作顶点缓冲区
+        //VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT：仅GPU可访问
+        createBuffer(bufferSize,
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    vertexBuffer, vertexBufferMemory);
+
+        //From stagingBuffer to vertexBuffer
+        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = sizeof(vertices[0]) * vertices.size();//缓冲区大小
-        bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;//指明缓冲区用途：顶点缓冲区
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;//指明缓冲区所有权：Only be used from the graphics queue
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create vertex buffer!");
+        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create buffer!");
         }
 
-        // 分配缓存区内存
-        //VkMemoryRequirements的成员有,可用于确定内存分配的最佳偏移量,填写VkMemoryAllocateInfo结构体
-        //size：所需内存大小
-        //alignment：在内存区的偏移量
-        //memoryTypeBits：可用的内存类型，GPU对不同的内存类型有不同的使用方式和性能特点
         VkMemoryRequirements memRequirements;
-        //获取缓冲区内存需求
-        vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
+        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        //VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT：内存可见(CPU可以访问)
-        //VK_MEMORY_PROPERTY_HOST_COHERENT_BIT：内存一致
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, 
-                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        //根据需求分配缓冲区内存 alloca
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate vertex buffer memory!");
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate buffer memory!");
         }
+        
+        //将内存和缓冲区对象关联
+        vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    }
 
-        //将缓冲区内存和缓冲区对象绑定
-        //第4个参数是偏移量，指定了要绑定的内存的起始位置
-        //如果偏移量非0，那么它必须是alignment的整数倍
-        //binding
-        vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+        //创建临时指令缓冲区
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = commandPool;
+        allocInfo.commandBufferCount = 1;
 
-        //copy vertex data from CPU to GPU: 速度慢
-        void* data;//the pointer to the mapped memory
-        vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-        memcpy(data, vertices.data(), (size_t) bufferInfo.size);
-        vkUnmapMemory(device, vertexBufferMemory);
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+        //开始记录指令缓冲区
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+        
+
+        //执行拷贝命令
+            VkBufferCopy copyRegion{};
+            copyRegion.size = size;
+            vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+        //结束记录指令缓冲区
+        vkEndCommandBuffer(commandBuffer);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+        //提交指令缓冲区，执行拷贝命令
+        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(graphicsQueue);//等待执行完毕
+        //销毁指令缓冲区（性能不好）
+        vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     }
 
     // 获取可用的内存类型

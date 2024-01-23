@@ -1,6 +1,10 @@
 /*
     command pool是用来管理command buffer的内存池，它管理着command buffer的生命周期
     command buffer是一个存储命令的缓冲区，它包含了执行绘制操作所需的命令
+
+    createCommandPool()
+    createCommandBuffer()
+    recordCommandBuffer()
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

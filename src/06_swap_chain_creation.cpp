@@ -1,6 +1,9 @@
 /*
     * Vulkan Tutorial (https://vulkan-tutorial.com/)
-    *
+    *   
+    *   交换链是渲染目标的集合。
+    *   它最基本的作用就是确保现在正在渲染的图像与现在显示在屏幕上的图像不是同一个。
+    * 
     *  - Swap chain creation
     *   Vulkan does not have the concept of a "default framebuffer", 
     *   hence it requires an infrastructure that will own the buffers 

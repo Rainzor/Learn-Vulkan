@@ -4,6 +4,11 @@
     *   It describes the configurable state of the graphics card, 
     *   like the viewport size and depth buffer operation and 
     *   the programmable state using VkShaderModule objects. 
+    * 
+    * Vulkan 中的图形管线由VkPipeline（管线）来建立。
+    * 它描述了显卡的一些可配置部分（不可编程部分），比如视口大小以及深度缓冲操作等，
+    * 而可编程部分则使用VkShaderModule对象来描述。VkShaderModule对象使用着色器的字节码来创建。
+    * 驱动还需要知道管线中的哪些渲染目标会被使用，这些渲染目标由通过引用render passes来指定。
 */
 
 #define GLFW_INCLUDE_VULKAN

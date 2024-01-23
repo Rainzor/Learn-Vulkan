@@ -1,24 +1,20 @@
 /*
-    *   Vertex Buffer
-    *
-    *   Buffers in Vulkan are regions of memory used for storing arbitrary data 
-    *   that can be read by the graphics card.
+    * A descriptor is a way for shaders to freely access resources like buffers and images. 
+    * Usage of descriptors consists of three parts:
+    * - Specify a descriptor layout during pipeline creation
+    * - Allocate a descriptor set from a descriptor pool
+    * - Bind the descriptor set during rendering
     * 
-    *   Buffers在Vulkan中是用于存储GPU可以读取的任意数据的内存区域。
+    * The descriptor layout specifies the types of resources that are going to be accessed by the pipeline
     * 
-    *   Overview of vertex class:
-    * 1.  define the class members
-    * 2.    getBindingDescription: 用来描述组成array的vertices
-    * 3.    getAttributeDescriptions: 用来描述如何处理每个顶点数据
     * 
-    *   Overview of add vertex buffer:
-    * 1.  Create a buffer
-    * 2.  Allocate memory to buffer
-    * 3.  Bind memory to buffer
-    * 4.  Copy data to buffer
-    * 5.  Bind buffer to VkPipeline
-    * 6.  Draw
+    * A descriptor set specifies the actual buffer or image resources that will be bound to the descriptors
     * 
+    * Uniform buffer objects
+    * 
+    * createDescriptorSetLayout()
+    * createGraphicsPipeline()
+    * createUniformBuffers()
     * 
 */
 #define GLFW_INCLUDE_VULKAN
@@ -139,16 +135,23 @@ struct Vertex {
     }
 };
 
-// const std::vector<Vertex> vertices = {
-//     {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-//     {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-//     {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
-// };
+struct UniformBufferObject {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
+
 
 const std::vector<Vertex> vertices = {
-    {{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
-    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+};
+
+//less than 65535
+const std::vector<uint16_t> indices = {
+    0, 1, 2, 2, 3, 0
 };
 
 class HelloTriangleApplication {
@@ -181,6 +184,7 @@ private:
     std::vector<VkFramebuffer> swapChainFramebuffers;//交换链帧缓冲
 
     VkRenderPass renderPass;//渲染流程句柄
+    VkDescriptorSetLayout descriptorSetLayout;//描述符布局句柄
     VkPipelineLayout pipelineLayout;//管线布局句柄
     VkPipeline graphicsPipeline;//图形管线句柄
 
@@ -189,6 +193,12 @@ private:
 
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
 
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
@@ -244,6 +254,9 @@ private:
         // 创建渲染流程
         createRenderPass();
 
+        // 创建描述符布局
+        createDescriptorSetLayout();
+
         // 创建图形管线
         createGraphicsPipeline();
 
@@ -255,6 +268,12 @@ private:
 
         // 创建顶点缓冲区
         createVertexBuffer();
+
+        // 创建索引缓冲区
+        createIndexBuffer();
+
+        // 创建全局缓冲区
+        createUniformBuffers();
 
         // 创建命令缓冲
         // createCommandBuffer() ;
@@ -292,9 +311,18 @@ private:
 
         vkDestroyPipeline(device, graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-
         vkDestroyRenderPass(device, renderPass, nullptr);
-        
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+        }
+
+        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+
+        vkDestroyBuffer(device, indexBuffer, nullptr);
+        vkFreeMemory(device, indexBufferMemory, nullptr);
+
         vkDestroyBuffer(device, vertexBuffer, nullptr);
         vkFreeMemory(device, vertexBufferMemory, nullptr);
 
@@ -689,7 +717,25 @@ private:
         }
 
     }
+    void createDescriptorSetLayout() {
+        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding.binding = 0;
+        uboLayoutBinding.descriptorCount = 1;
+        // 用于指定描述符类型：
+        // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER：uniform缓冲区 
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.pImmutableSamplers = nullptr;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &uboLayoutBinding;
+
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+    }
     //  创建图形管线
     void createGraphicsPipeline() {
         auto vertShaderCode = readFile("../shaders/vert.spv");//顶点着色器
@@ -841,7 +887,6 @@ private:
             throw std::runtime_error("failed to create graphics pipeline!");
         }
 
-
         // 15. 销毁着色器模块
         vkDestroyShaderModule(device, fragShaderModule, nullptr);//销毁片段着色器模块   
         vkDestroyShaderModule(device, vertShaderModule, nullptr);//销毁顶点着色器模块
@@ -900,50 +945,132 @@ private:
         }
     }
 
-    // 创建顶点缓冲区
     void createVertexBuffer() {
+        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        //VK_BUFFER_USAGE_TRANSFER_SRC_BIT：缓冲区可以用作内存传输操作的源
+        //VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT：CPU可访问
+        //VK_MEMORY_PROPERTY_HOST_COHERENT_BIT：CPU内存一致
+        createBuffer(bufferSize, 
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                    stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, vertices.data(), (size_t) bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        //VK_BUFFER_USAGE_TRANSFER_DST_BIT：缓冲区可以用作内存传输操作的目标
+        //VK_BUFFER_USAGE_VERTEX_BUFFER_BIT：缓冲区可以用作顶点缓冲区
+        //VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT：仅GPU可访问
+        createBuffer(bufferSize,
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    vertexBuffer, vertexBufferMemory);
+
+        //From stagingBuffer to vertexBuffer
+        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+
+    void createIndexBuffer() {
+        VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, 
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, indices.data(), (size_t) bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+
+        //VK_BUFFER_USAGE_TRANSFER_DST_BIT：缓冲区可以用作内存传输操作的目标
+        //VK_BUFFER_USAGE_INDEX_BUFFER_BIT：缓冲区可以用作索引缓冲区
+        //VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT：仅GPU可访问
+        createBuffer(bufferSize, 
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    indexBuffer, indexBufferMemory);
+
+        copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = sizeof(vertices[0]) * vertices.size();//缓冲区大小
-        bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;//指明缓冲区用途：顶点缓冲区
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;//指明缓冲区所有权：Only be used from the graphics queue
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create vertex buffer!");
+        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create buffer!");
         }
 
-        // 分配缓存区内存
-        //VkMemoryRequirements的成员有,可用于确定内存分配的最佳偏移量,填写VkMemoryAllocateInfo结构体
-        //size：所需内存大小
-        //alignment：在内存区的偏移量
-        //memoryTypeBits：可用的内存类型，GPU对不同的内存类型有不同的使用方式和性能特点
         VkMemoryRequirements memRequirements;
-        //获取缓冲区内存需求
-        vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
+        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        //VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT：内存可见(CPU可以访问)
-        //VK_MEMORY_PROPERTY_HOST_COHERENT_BIT：内存一致
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, 
-                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        //根据需求分配缓冲区内存 alloca
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate vertex buffer memory!");
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate buffer memory!");
         }
+        
+        //将内存和缓冲区对象关联
+        vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    }
 
-        //将缓冲区内存和缓冲区对象绑定
-        //第4个参数是偏移量，指定了要绑定的内存的起始位置
-        //如果偏移量非0，那么它必须是alignment的整数倍
-        //binding
-        vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+        //创建临时指令缓冲区
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = commandPool;
+        allocInfo.commandBufferCount = 1;
 
-        //copy vertex data from CPU to GPU: 速度慢
-        void* data;//the pointer to the mapped memory
-        vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-        memcpy(data, vertices.data(), (size_t) bufferInfo.size);
-        vkUnmapMemory(device, vertexBufferMemory);
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+        //开始记录指令缓冲区
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+        
+
+        //执行拷贝命令
+            VkBufferCopy copyRegion{};
+            copyRegion.size = size;
+            vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+        //结束记录指令缓冲区
+        vkEndCommandBuffer(commandBuffer);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+        //提交指令缓冲区，执行拷贝命令
+        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(graphicsQueue);//等待执行完毕
+        //销毁指令缓冲区（性能不好）
+        vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     }
 
     // 获取可用的内存类型
@@ -1011,17 +1138,22 @@ private:
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
         //*-----------------------------------绑定顶点缓冲区-----------------------------------*//
-        //CmdDraw:绘制三角形
-        //参数：
-        //vertexCount：指定顶点数量
-        //instanceCount：指定实例数量
-        //firstVertex：指定顶点偏移量
-        //firstInstance：指定实例偏移量
-        // vkCmdDraw(commandBuffer, 3, 1, 0, 0);
         VkBuffer vertexBuffers[] = {vertexBuffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+
+        // vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    
+        //vkCmdDrawIndexed 参数：
+        //commandBuffer：指定要记录的指令缓冲
+        //indexCount：绘制的索引数量
+        //instanceCount：实例数量
+        //firstIndex：索引缓冲区中的偏移量
+        //vertexOffset：顶点缓冲区中的偏移量
+        //firstInstance：实例ID的偏移量
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
 
         //*----------------------------------------------------------------------------------*//
 
