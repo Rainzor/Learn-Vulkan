@@ -7,25 +7,38 @@
     * 
     * The descriptor layout specifies the types of resources that are going to be accessed by the pipeline
     * 
-    * 
     * A descriptor set specifies the actual buffer or image resources that will be bound to the descriptors
     * 
-    * Uniform buffer objects
+    * We can create a descriptor set for each VkBuffer resource to bind it to the uniform buffer descriptor.
+    * 一个 Descriptor 可以认为是一个资源绑定描述，而 DescriptorSet 是定义在 GPU 中的一个描述表，方便 Shader 访问到对应的资源地址、
+    * 
+    * 在DescriptorSetLayout的指导下，利用Descriptor Pool提供的Descriptors，组装成一个符合DescriptorSetLayout的Set
+    * 
+    * resource就如同游戏卡一样，当他被创建好了之后，他会有一个描述访问此resource的接口，也就是layout，
+    * 这个layout将这个资源的蓝图进行描述，不牵扯到其具体的数据信息。这个layout蓝图，将会分配给pipeline object(游戏机)，
+    * 使得后期对资源进行绑定的时候，可以正确的将资源插入到对应的插槽中。
+    * 
+    * Descriptor set -- 记录对应资源蓝图的资源具体位置以及对资源进行汇总
+    * Descriptor layout -- 记录了一种描述符的蓝图，但是他并没有指向任何有效的资源位置
     * 
     * createDescriptorSetLayout()
-    * createGraphicsPipeline()
     * createUniformBuffers()
+    * updateUniformBuffer()
+    * createDescriptorPool()
     * 
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>
+#include <chrono>
 #include <vector>
 #include <cstring>
 #include <cstdlib>
@@ -200,6 +213,9 @@ private:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*> uniformBuffersMapped;
 
+    VkDescriptorPool descriptorPool;
+    std::vector<VkDescriptorSet> descriptorSets;
+
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
@@ -275,6 +291,12 @@ private:
         // 创建全局缓冲区
         createUniformBuffers();
 
+        // 创建描述符池
+        createDescriptorPool();
+
+        // 创建描述符集
+        createDescriptorSets();
+
         // 创建命令缓冲
         // createCommandBuffer() ;
         createCommandBuffers();
@@ -317,6 +339,9 @@ private:
             vkDestroyBuffer(device, uniformBuffers[i], nullptr);
             vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
         }
+
+        //Set被自动销毁
+        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
@@ -725,6 +750,7 @@ private:
         // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER：uniform缓冲区 
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboLayoutBinding.pImmutableSamplers = nullptr;
+        // 指定在vertex shader中使用
         uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
@@ -800,7 +826,7 @@ private:
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;//片段线宽
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;//剔除模式：背面剔除
-        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;//正面朝向：顺时针
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;//逆时针为正面
         rasterizer.depthBiasEnable = VK_FALSE;//启用深度偏移
 
         // 9. 配置多重采样信息
@@ -855,11 +881,9 @@ private:
         // 配置一些uniform值，它们可以在着色器中使用
         // uniform值是在绘制过程中可以改变的值,它们可以用来传递变换矩阵和纹理采样器
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;//管线布局信息
-        pipelineLayoutInfo.setLayoutCount = 0;//布局数量
-        pipelineLayoutInfo.pSetLayouts = nullptr;//布局
-        pipelineLayoutInfo.pushConstantRangeCount = 0;//推送常量范围数量
-        pipelineLayoutInfo.pPushConstantRanges = nullptr;//推送常量范围
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;//描述符集布局
 
         // 13. 创建管线布局
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
@@ -1008,6 +1032,81 @@ private:
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
+    void createUniformBuffers() {
+        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+        uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+        uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            createBuffer(bufferSize, 
+                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        uniformBuffers[i],
+                        uniformBuffersMemory[i]);
+            // persistent mapped memory
+            // uniformBuffersMapped are pointers to the mapped memory
+            // mapping is expensive operation, so we map it once and reuse it
+            vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+        }
+    }
+
+    void createDescriptorPool() {
+        VkDescriptorPoolSize poolSize{};
+        //VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER：uniform缓冲区
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+    }
+
+    void createDescriptorSets() {
+        //descriptor layout记录了一种描述符的蓝图，但是他并没有指向任何有效的资源位置
+        //descriptor set：描述layout对应的具体资源是什么，每个shader 的 binding绑定的内容是什么。
+        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.pSetLayouts = layouts.data();
+        //we will create one descriptor set for each frame in flight, all with the same layout
+        descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        //allocate descriptor sets
+        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = uniformBuffers[i];//实际的uniform缓冲区
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformBufferObject);
+
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = descriptorSets[i];
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;//not an array
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &bufferInfo;
+            //其他可使用的资源
+            descriptorWrite.pImageInfo = nullptr;//optional 
+            descriptorWrite.pTexelBufferView = nullptr;//optional
+
+            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+        }
+    }
+
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1116,7 +1215,8 @@ private:
         VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearColor;
-        //开始渲染流程
+
+        /*--------------------------------开始渲染流程------------------------------------*/
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         //绑定管线：指定要使用的管线对象，以获得管线的状态
         // The second parameter specifies if the pipeline object is a graphics or compute pipeline. 
@@ -1137,14 +1237,31 @@ private:
         scissor.extent = swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        //*-----------------------------------绑定顶点缓冲区-----------------------------------*//
+
+        /*-----------------------------------绑定顶点缓冲区-----------------------------------*/
         VkBuffer vertexBuffers[] = {vertexBuffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
         // vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-    
+
+        //绑定描述符集：使用描述符集来更新着色器中的uniform值
+        //参数：
+        //commandBuffer：指定要记录的指令缓冲
+        //pipelineBindPoint：指定管线类型
+        //layout：指定管线布局
+        //firstSet：the index of the first descriptor set
+        //descriptorSetCount：the number of sets to bind
+        //pDescriptorSets：the array of sets to bind
+        //dynamicOffsetCount：指定动态偏移量数量
+        //pDynamicOffsets：指定动态偏移量数组
+        vkCmdBindDescriptorSets(commandBuffer, 
+                                VK_PIPELINE_BIND_POINT_GRAPHICS, 
+                                pipelineLayout, 
+                                0, 1, &descriptorSets[currentFrame], 0, 
+                                nullptr);
+
         //vkCmdDrawIndexed 参数：
         //commandBuffer：指定要记录的指令缓冲
         //indexCount：绘制的索引数量
@@ -1154,11 +1271,8 @@ private:
         //firstInstance：实例ID的偏移量
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
-
-        //*----------------------------------------------------------------------------------*//
-
-        //结束渲染流程
         vkCmdEndRenderPass(commandBuffer);
+        //*----------------------------------结束渲染流程---------------------------------*//
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS){
             throw std::runtime_error("failed to record command buffer!");
@@ -1190,6 +1304,23 @@ private:
         }
     }
 
+    void updateUniformBuffer(uint32_t currentImage) {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UniformBufferObject ubo{};
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
+        ubo.proj[1][1] *= -1;
+
+        //将数据拷贝到uniform缓冲区
+        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+    }
+
+
     // 绘制一帧!!!!!!!!!
     void drawFrame() {
         // 1. 等待上一帧渲染结束
@@ -1205,6 +1336,9 @@ private:
         } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
             throw std::runtime_error("failed to acquire swap chain image!");
         }
+
+        // 更新uniform缓冲区
+        updateUniformBuffer(currentFrame);
 
         // 3. 重置上一帧渲染结束的标志位
         // Only reset the fence if we are submitting work
