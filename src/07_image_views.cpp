@@ -2,7 +2,11 @@
     * Vulkan Tutorial (https://vulkan-tutorial.com/)
     *
     *  - image views
-    *   图像视图描述了访问图像的方式，以及图像的哪一部分可以被访问。
+    *   图像视图描述了访问图像的方式，以及图像的哪一部分可以被访问，用于描述如何将图像数据解释为纹理、渲染目标等
+    *   
+    *   从Swapchain获取图像后，还不能直接在图像上进行绘制，需要将图像先包装为VkImageView和VkFramebuffer。
+    *   图像视图引用图像的特定部分，帧缓冲引用图像视图作为颜色，深度和模板目标。
+    * 
     *   An image view is quite literally a view into an image. 
     *   It describes how to access the image and which part of the image to access, 
     *   for example if it should be treated as a 2D texture depth texture without any mipmapping levels.

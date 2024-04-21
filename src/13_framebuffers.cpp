@@ -1,11 +1,15 @@
 /*
     *   Framebuffers: 帧缓冲
+    *   Framebuffers are the objects that represent a collection of memory attachments that can be rendered to.
+    *   
+    *   Framebuffer就是一段存储空间，其可以位于显存，也可以位于内存,用于存储渲染:颜色、深度、模板等数据
     *   
     *   a framebuffer specifies the actual image views to bind to render pass attachments
     * 
     *   FrameBuffer表示可用作附件(渲染目标)的实际图像的链接。
     *   通过指定RenderPass和一组Imageview创建一个Framebuffer对象。
     *   当然，它们的数量和格式必须与RenderPass的规范相匹配。
+    * 
     *   Framebuffer是Image之上的另一层，基本上将这些Imageview组合在一起，以便在渲染特定RenderPass期间绑定为附件。
     *   每当开始渲染RernderPass时，调用函数vkCmdBeginRenderPass并将FrameBuffer传递给它。
     * 

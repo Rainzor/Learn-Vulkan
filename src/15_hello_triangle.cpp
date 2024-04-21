@@ -16,6 +16,8 @@
     9. Allocate and record a command buffer with the draw commands for every possible swap chain image
     10. Draw frames by acquiring images, submitting the right draw command buffer and 
         returning the images back to the swap chain for presentation
+
+    
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

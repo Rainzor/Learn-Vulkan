@@ -3,6 +3,9 @@
     *
     *  - shader modules
     *   定义了着色器模块用于图形管线哪一可编程阶段
+    *   
+    * 
+    *   本节主要定义了图形管线中可编程阶段的着色器模块
     * 
     *   createGraphicsPipeline()
     *   VkPipelineLayout pipelineLayout
