@@ -1,5 +1,11 @@
 /*
     允许我们在窗口大小改变时重新创建交换链
+
+    create:
+        - recreateSwapChain()
+        - cleanupSwapChain()
+    change: 
+        - drawFrame()
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

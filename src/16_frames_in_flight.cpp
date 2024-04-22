@@ -6,6 +6,22 @@
                 Any resource that is accessed and modified during rendering must be duplicated.
 
     "in-flight" 指的是同时有多个渲染帧处于并行处理过程中的状态
+
+    create:
+        - MAX_FRAMES_IN_FLIGHT = 2
+        - std::vector<VkCommandBuffer> commandBuffers;
+        - std::vector<VkSemaphore> imageAvailableSemaphores;
+        - std::vector<VkSemaphore> renderFinishedSemaphores;
+        - std::vector<VkFence> inFlightFences;
+
+    change:
+        - VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];
+        - VkSemaphore renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];
+        - VkFence inFlightFences[MAX_FRAMES_IN_FLIGHT];
+        - createSyncObjects();
+        - createCommandBuffers()
+        - drawFrame();
+
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

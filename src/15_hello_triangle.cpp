@@ -784,6 +784,7 @@ private:
             throw std::runtime_error("failed to allocate command buffers!");
         }
     }
+    
     // 记录指令缓冲
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
         VkCommandBufferBeginInfo beginInfo{};
@@ -838,7 +839,6 @@ private:
         //firstInstance：指定实例偏移量
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
         //*----------------------------------------------------------------------------------*//
-
 
         //结束渲染流程
         vkCmdEndRenderPass(commandBuffer);
@@ -1012,7 +1012,6 @@ private:
             return actualExtent;
         }
     }
-
 
     // 交换链支持信息
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
