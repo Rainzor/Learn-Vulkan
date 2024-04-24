@@ -8,8 +8,8 @@
     * 
     *   Overview of vertex class:
     * 1.  define the class members
-    * 2.    getBindingDescription: 用来描述组成array的vertices
-    * 3.    getAttributeDescriptions: 用来描述如何处理每个顶点数据
+    * 2.  getBindingDescription: 用来描述组成array的vertices
+    * 3.  getAttributeDescriptions: 用来描述如何处理每个顶点数据
     * 
     *   Overview of add vertex buffer:
     * 1.  Create a buffer
