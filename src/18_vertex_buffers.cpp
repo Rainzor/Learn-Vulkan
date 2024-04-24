@@ -5,6 +5,9 @@
     *   that can be read by the graphics card.
     * 
     *   Buffers在Vulkan中是用于存储GPU可以读取的任意数据的内存区域。
+    *   Buffer减少了从CPU到GPU的数据传输次数，提高了性能。
+    *   Buffer是一种内存对象，它可以存储任意数据，包括顶点数据、索引数据、纹理数据等。
+    *   Buffer不会自动分配内存，需要手动分配内存。
     * 
     *   Overview of vertex class:
     * 1.  define the class members
@@ -18,6 +21,13 @@
     * 4.  Copy data to buffer
     * 5.  Bind buffer to VkPipeline
     * 6.  Draw
+    * 
+    * add:
+    *   Strcut Vertex: 用来描述顶点数据
+    *   createVertexBuffer(): 创建顶点缓冲区
+    * Modify:
+    *   createGraphicsPipeline()
+    *   
     * 
     * 
 */
@@ -900,7 +910,9 @@ private:
         }
     }
 
-    // 创建顶点缓冲区
+    // 创建顶点缓冲区, 与缓冲区对象绑定
+    // 分配缓存区内存，不关心以什么样的方式读取内存中的数据
+    // 理解为Allocating memory for the buffer
     void createVertexBuffer() {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -912,13 +924,12 @@ private:
             throw std::runtime_error("failed to create vertex buffer!");
         }
 
-        // 分配缓存区内存
         //VkMemoryRequirements的成员有,可用于确定内存分配的最佳偏移量,填写VkMemoryAllocateInfo结构体
         //size：所需内存大小
         //alignment：在内存区的偏移量
         //memoryTypeBits：可用的内存类型，GPU对不同的内存类型有不同的使用方式和性能特点
         VkMemoryRequirements memRequirements;
-        //获取缓冲区内存需求
+        //获取缓冲区内存需求，如所需内存大小、内存类型等
         vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
 
         VkMemoryAllocateInfo allocInfo{};
@@ -940,6 +951,7 @@ private:
         vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
 
         //copy vertex data from CPU to GPU: 速度慢
+        // vkMapMemory 函数的作用是允许你直接从CPU访问GPU内存
         void* data;//the pointer to the mapped memory
         vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
         memcpy(data, vertices.data(), (size_t) bufferInfo.size);
@@ -963,7 +975,6 @@ private:
 
         throw std::runtime_error("failed to find suitable memory type!");
     }
-    
     
     // 记录指令缓冲
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {

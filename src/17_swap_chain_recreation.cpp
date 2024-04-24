@@ -1,7 +1,7 @@
 /*
     允许我们在窗口大小改变时重新创建交换链
 
-    create:
+    add:
         - recreateSwapChain()
         - cleanupSwapChain()
     change: 

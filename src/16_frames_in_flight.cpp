@@ -7,7 +7,7 @@
 
     "in-flight" 指的是同时有多个渲染帧处于并行处理过程中的状态
 
-    create:
+    add:
         - MAX_FRAMES_IN_FLIGHT = 2
         - std::vector<VkCommandBuffer> commandBuffers;
         - std::vector<VkSemaphore> imageAvailableSemaphores;

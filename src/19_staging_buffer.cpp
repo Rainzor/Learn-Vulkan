@@ -3,11 +3,16 @@
     *  使用一个缓冲区来存储顶点数据，然后将数据拷贝到顶点缓冲区对象中
     *  避免了直接从CPU内存拷贝到GPU内存，提高了性能
     * 
-    *   作用：作为CPU和GPU传递数据的中间站，将数据从CPU内存拷贝到缓冲区，再从缓冲区拷贝到GPU内存
+    *   作用：作为CPU和GPU传递数据的中间站，
+    *        将数据从CPU内存拷贝到暂存缓冲区，
+    *        再从暂存缓冲区拷贝到顶点缓冲所在GPU内存
     * 
-    * createVertexBuffer()
-    * createBuffer()
-    * copyBuffer()
+    * add:
+    *   createBuffer()
+    *   copyBuffer()
+    * 
+    * modify:
+    *   createVertexBuffer()
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -888,39 +893,6 @@ private:
         }
     }
 
-    void createVertexBuffer() {
-        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
-
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        //VK_BUFFER_USAGE_TRANSFER_SRC_BIT：缓冲区可以用作内存传输操作的源
-        //VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT：CPU可访问
-        //VK_MEMORY_PROPERTY_HOST_COHERENT_BIT：CPU内存一致
-        createBuffer(bufferSize, 
-                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-                    stagingBuffer, stagingBufferMemory);
-
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, vertices.data(), (size_t) bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        //VK_BUFFER_USAGE_TRANSFER_DST_BIT：缓冲区可以用作内存传输操作的目标
-        //VK_BUFFER_USAGE_VERTEX_BUFFER_BIT：缓冲区可以用作顶点缓冲区
-        //VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT：仅GPU可访问
-        createBuffer(bufferSize,
-                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    vertexBuffer, vertexBufferMemory);
-
-        //From stagingBuffer to vertexBuffer
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-    }
-
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -984,6 +956,39 @@ private:
         vkQueueWaitIdle(graphicsQueue);//等待执行完毕
         //销毁指令缓冲区（性能不好）
         vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    }
+
+    void createVertexBuffer() {
+        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        //VK_BUFFER_USAGE_TRANSFER_SRC_BIT：缓冲区可以用作内存传输操作的源
+        //VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT：CPU可访问
+        //VK_MEMORY_PROPERTY_HOST_COHERENT_BIT：CPU内存一致
+        createBuffer(bufferSize, 
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                    stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, vertices.data(), (size_t) bufferSize);
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        //VK_BUFFER_USAGE_TRANSFER_DST_BIT：缓冲区可以用作内存传输操作的目标
+        //VK_BUFFER_USAGE_VERTEX_BUFFER_BIT：缓冲区可以用作顶点缓冲区
+        //VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT：仅GPU可访问
+        createBuffer(bufferSize,
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    vertexBuffer, vertexBufferMemory);
+
+        //From stagingBuffer to vertexBuffer
+        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
     // 获取可用的内存类型

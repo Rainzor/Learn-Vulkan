@@ -2,9 +2,11 @@
     *  index buffer
     *  用于存储顶点索引，以便重用顶点
     * 
-    * createIndexBuffer()
+    * add:
+    *   createIndexBuffer()
     * 
-    * 
+    * modify:
+    *   recordCommandBuffer()
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>

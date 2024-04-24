@@ -1,4 +1,6 @@
 /*
+    * 解决全局变量的分配 Uniform
+    *
     * A descriptor is a way for shaders to freely access resources like buffers and images. 
     * Usage of descriptors consists of three parts:
     * - Specify a descriptor layout during pipeline creation
@@ -10,6 +12,7 @@
     * A descriptor set specifies the actual buffer or image resources that will be bound to the descriptors
     * 
     * We can create a descriptor set for each VkBuffer resource to bind it to the uniform buffer descriptor.
+    * 
     * 一个 Descriptor 可以认为是一个资源绑定描述，而 DescriptorSet 是定义在 GPU 中的一个描述表，方便 Shader 访问到对应的资源地址、
     * 
     * 在DescriptorSetLayout的指导下，利用Descriptor Pool提供的Descriptors，组装成一个符合DescriptorSetLayout的Set
@@ -21,16 +24,26 @@
     * Descriptor set -- 记录对应资源蓝图的资源具体位置以及对资源进行汇总
     * Descriptor layout -- 记录了一种描述符的蓝图，但是他并没有指向任何有效的资源位置
     * 
-    * createDescriptorSetLayout()
-    * createUniformBuffers()
-    * updateUniformBuffer()
-    * createDescriptorPool()
+    * uniformBuffers的大小要与swapChainImages的大小一致，因为每个swapChainImage都需要一个uniformBuffer，防止前一帧的uniformBuffer被下一帧使用
+    * 
+    * add:
+    *   createDescriptorSetLayout()
+    *   createUniformBuffers()
+    *   updateUniformBuffer()
+    *   createDescriptorPool()
+    *   createDescriptorSets()
+    *   
+    * modify:
+    *   createGraphicsPipeline()
+    *   drawFrame()
     * 
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
+// 强制GLM使用角度制
 #define GLM_FORCE_RADIANS
+// 强制glm对数据进行对齐
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -750,7 +763,7 @@ private:
         // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER：uniform缓冲区 
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboLayoutBinding.pImmutableSamplers = nullptr;
-        // 指定在vertex shader中使用
+        // 指定在vertex shader中使用 Uniform Buffer Object
         uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
@@ -1048,6 +1061,8 @@ private:
             // persistent mapped memory
             // uniformBuffersMapped are pointers to the mapped memory
             // mapping is expensive operation, so we map it once and reuse it
+            // 因为Uniform很容易被改变，
+            // 在应用程序的整个生命周期中，缓冲区始终映射到该指针，不用解除映射，称为“持久映射”
             vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
         }
     }
@@ -1070,7 +1085,7 @@ private:
     }
 
     void createDescriptorSets() {
-        //descriptor layout记录了一种描述符的蓝图，但是他并没有指向任何有效的资源位置
+        //descriptor layout：记录了一种描述符的蓝图，但是他并没有指向任何有效的资源位置
         //descriptor set：描述layout对应的具体资源是什么，每个shader 的 binding绑定的内容是什么。
         std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
@@ -1080,11 +1095,13 @@ private:
         allocInfo.pSetLayouts = layouts.data();
         //we will create one descriptor set for each frame in flight, all with the same layout
         descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        //allocate descriptor sets
+
+        //allocate descriptor sets from the pool
         if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate descriptor sets!");
         }
 
+        //update descriptor sets
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo bufferInfo{};
             bufferInfo.buffer = uniformBuffers[i];//实际的uniform缓冲区
@@ -1247,6 +1264,7 @@ private:
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
         //绑定描述符集：使用描述符集来更新着色器中的uniform值
+        //descriptorSets 中指定的描述符集将绑定到指定的管线布局的指定绑定点
         //参数：
         //commandBuffer：指定要记录的指令缓冲
         //pipelineBindPoint：指定管线类型
@@ -1316,7 +1334,7 @@ private:
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
 
-        //将数据拷贝到uniform缓冲区
+        //将数据拷贝到uniform缓冲区，在这里我们使用了持久映射
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
