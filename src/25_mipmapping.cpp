@@ -219,13 +219,14 @@ private:
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;//深度图像视图
 
+    uint32_t mipLevels;//纹理图像mipmap级别
     VkImage textureImage;//纹理图像句柄
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;//纹理图像视图
     VkSampler textureSampler;
 
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
+    std::vector<Vertex> vertices;//顶点
+    std::vector<uint32_t> indices;//索引
 
     VkBuffer vertexBuffer;//顶点缓冲区句柄
     VkDeviceMemory vertexBufferMemory;
