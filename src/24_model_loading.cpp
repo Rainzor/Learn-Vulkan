@@ -1,27 +1,10 @@
 /*
-    * 深度缓冲 Depth Buffer
-    * 
-    * A depth buffer is an additional attachment that stores the depth for every position, 
-    * just like the color attachment stores the color of every position. 
-    * 
-    * Every time the rasterizer produces a fragment, 
-    * the depth test will check if the new fragment is closer than the previous one. 
-    * 
-    * If it isn't, then the new fragment is discarded.
+    * 模型载入
+    * tinyobjloader库
+    * 读取obj文件，解析顶点、法线、纹理坐标等信息
     * 
     * add:
-    *   createDepthResources()
-    *   findSupportedFormat()
-    *   findDepthFormat()
-    *   hasStencilComponent()
-    * 
-    * modify:
-    *   struct Vertex
-    *   createImageViews()
-    *   transitionImageLayout()
-    *   createRenderPass()
-    *   createFramebuffers()
-    *   createGraphicsPipeline()
+    *   loadModel()
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -1879,13 +1862,13 @@ private:
         // 1. 如果只有一个可用的表面格式，并且格式为VK_FORMAT_UNDEFINED，则表示所有格式都可用
         if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
             // 返回默认格式：BGRA8，SRGB_NONLINEAR
-            return {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+            return {VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
         }
 
         // 2. 如果不是所有格式都可用，需要遍历所有可用的表面格式，选择最佳的格式
         for (const auto& availableFormat : availableFormats) {
             // 选择最佳的格式
-            if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && 
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && 
                 availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                 return availableFormat;
             }

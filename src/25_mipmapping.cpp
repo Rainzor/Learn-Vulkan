@@ -1,27 +1,4 @@
 /*
-    * 深度缓冲 Depth Buffer
-    * 
-    * A depth buffer is an additional attachment that stores the depth for every position, 
-    * just like the color attachment stores the color of every position. 
-    * 
-    * Every time the rasterizer produces a fragment, 
-    * the depth test will check if the new fragment is closer than the previous one. 
-    * 
-    * If it isn't, then the new fragment is discarded.
-    * 
-    * add:
-    *   createDepthResources()
-    *   findSupportedFormat()
-    *   findDepthFormat()
-    *   hasStencilComponent()
-    * 
-    * modify:
-    *   struct Vertex
-    *   createImageViews()
-    *   transitionImageLayout()
-    *   createRenderPass()
-    *   createFramebuffers()
-    *   createGraphicsPipeline()
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -52,8 +29,8 @@
 #include <array>
 #include <optional>
 #include <set>
-
 #include <unordered_map>
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
@@ -67,6 +44,7 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
+
 const std::vector<const char*> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
@@ -160,6 +138,7 @@ struct Vertex {
 
         return attributeDescriptions;
     }
+    
     bool operator==(const Vertex& other) const {
         return pos == other.pos && color == other.color && texCoord == other.texCoord;
     }
@@ -178,6 +157,7 @@ struct UniformBufferObject {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
 };
+
 class HelloTriangleApplication {
 public:
     void run() {
@@ -221,6 +201,7 @@ private:
 
     uint32_t mipLevels;//纹理图像mipmap级别
     VkImage textureImage;//纹理图像句柄
+    
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;//纹理图像视图
     VkSampler textureSampler;
@@ -409,7 +390,7 @@ private:
 
         vkDestroyDevice(device, nullptr);//销毁逻辑设备
 
-        if(enableValidationLayers) {
+        if (enableValidationLayers) {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);//销毁调试信息
         }
         vkDestroySurfaceKHR(instance, surface, nullptr);//销毁表面
@@ -474,17 +455,14 @@ private:
 
         // validation layers
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        if (enableValidationLayers)
-        {
+        if (enableValidationLayers) {
             // 在校验层启用的情况下，使用校验层
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size()); // 启用的校验层数量
             createInfo.ppEnabledLayerNames = validationLayers.data();                      // 启用的校验层名称
             // 配置调试信息
             populateDebugMessengerCreateInfo(debugCreateInfo);
-            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
-        }
-        else
-        {
+            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
+        } else {
             createInfo.enabledLayerCount = 0; // 启用的校验层数量
             createInfo.pNext = nullptr;
         }
@@ -616,7 +594,7 @@ private:
         createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());//启用的扩展数量
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-        if(enableValidationLayers) {
+        if (enableValidationLayers) {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());//启用的校验层数量
             createInfo.ppEnabledLayerNames = validationLayers.data();//启用的校验层名称
         } else {
@@ -896,10 +874,10 @@ private:
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;//多重采样信息
         multisampling.sampleShadingEnable = VK_FALSE;//启用采样阴影
         multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;//采样数量
-        multisampling.minSampleShading = 1.0f;//最小采样阴影
-        multisampling.pSampleMask = nullptr;//采样掩码
-        multisampling.alphaToCoverageEnable = VK_FALSE;
-        multisampling.alphaToOneEnable = VK_FALSE;
+        // multisampling.minSampleShading = 1.0f;//最小采样阴影
+        // multisampling.pSampleMask = nullptr;//采样掩码
+        // multisampling.alphaToCoverageEnable = VK_FALSE;
+        // multisampling.alphaToOneEnable = VK_FALSE;
 
         // 10. 配置深度模板信息
         VkPipelineDepthStencilStateCreateInfo depthStencil{};
@@ -1025,20 +1003,6 @@ private:
             throw std::runtime_error("failed to create command pool!");
         }
     }
-    // 多帧并发，创建指令缓冲
-    void createCommandBuffers() {
-        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = commandPool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
-
-        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate command buffers!");
-        }
-    }
 
     void createDepthResources() {
         VkFormat depthFormat = findDepthFormat();
@@ -1147,61 +1111,6 @@ private:
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    
-    void createImage(uint32_t width, 
-                    uint32_t height, 
-                    VkFormat format, 
-                    VkImageTiling tiling, 
-                    VkImageUsageFlags usage, 
-                    VkMemoryPropertyFlags properties, 
-                    VkImage& image, 
-                    VkDeviceMemory& imageMemory) {
-        VkImageCreateInfo imageInfo{};
-        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.extent.width = width;
-        imageInfo.extent.height = height;
-        imageInfo.extent.depth = 1;
-        imageInfo.mipLevels = 1;
-        imageInfo.arrayLayers = 1;
-        imageInfo.format = format;//图像格式:VK_FORMAT_R8G8B8A8_SRGB
-        //Tiling是关于纹理像素的布局方式，
-        //VK_IMAGE_TILING_OPTIMAL,最高效的布局,空间中相邻的像素点的内存位置也尽可能挨在一起
-        //VK_IMAGE_TILING_LINEAR,row-major order, be able to directly access texels in the memory of the image
-        imageInfo.tiling = tiling;
-        //图像初始化布局：
-        //VK_IMAGE_LAYOUT_UNDEFINED：Not usable by the GPU and the very first transition will discard the texels.
-        //VK_IMAGE_LAYOUT_PREINITIALIZED：Not usable by the GPU, but the first transition will preserve the texels.
-        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        //图像用途：
-        //VK_IMAGE_USAGE_TRANSFER_SRC_BIT：缓冲区可以用作内存传输操作的源
-        //VK_IMAGE_USAGE_TRANSFER_DST_BIT：缓冲区可以用作内存传输操作的目标
-        //VK_IMAGE_USAGE_SAMPLED_BIT：缓冲区可以用作采样纹理
-        //VK_IMAGE_USAGE_STORAGE_BIT：缓冲区可以用作存储图像
-        imageInfo.usage = usage;
-        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-        if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create image!");
-        }
-
-        //申请图像内存
-        VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(device, image, &memRequirements);
-        //分配内存
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate image memory!");
-        }
-        //绑定内存
-        vkBindImageMemory(device, image, imageMemory, 0);
-    }
-
     void createTextureImageView() {
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
     }
@@ -1256,6 +1165,59 @@ private:
         }
 
         return imageView;
+    }
+    void createImage(uint32_t width, 
+                    uint32_t height, 
+                    VkFormat format, 
+                    VkImageTiling tiling, 
+                    VkImageUsageFlags usage, 
+                    VkMemoryPropertyFlags properties, 
+                    VkImage& image, 
+                    VkDeviceMemory& imageMemory) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = width;
+        imageInfo.extent.height = height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = format;//图像格式:VK_FORMAT_R8G8B8A8_SRGB
+        //Tiling是关于纹理像素的布局方式，
+        //VK_IMAGE_TILING_OPTIMAL,最高效的布局,空间中相邻的像素点的内存位置也尽可能挨在一起
+        //VK_IMAGE_TILING_LINEAR,row-major order, be able to directly access texels in the memory of the image
+        imageInfo.tiling = tiling;
+        //图像初始化布局：
+        //VK_IMAGE_LAYOUT_UNDEFINED：Not usable by the GPU and the very first transition will discard the texels.
+        //VK_IMAGE_LAYOUT_PREINITIALIZED：Not usable by the GPU, but the first transition will preserve the texels.
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        //图像用途：
+        //VK_IMAGE_USAGE_TRANSFER_SRC_BIT：缓冲区可以用作内存传输操作的源
+        //VK_IMAGE_USAGE_TRANSFER_DST_BIT：缓冲区可以用作内存传输操作的目标
+        //VK_IMAGE_USAGE_SAMPLED_BIT：缓冲区可以用作采样纹理
+        //VK_IMAGE_USAGE_STORAGE_BIT：缓冲区可以用作存储图像
+        imageInfo.usage = usage;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create image!");
+        }
+
+        //申请图像内存
+        VkMemoryRequirements memRequirements;
+        vkGetImageMemoryRequirements(device, image, &memRequirements);
+        //分配内存
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate image memory!");
+        }
+        //绑定内存
+        vkBindImageMemory(device, image, imageMemory, 0);
     }
 
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
@@ -1590,6 +1552,7 @@ private:
 
         VkCommandBuffer commandBuffer;
         vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -1642,7 +1605,22 @@ private:
 
         throw std::runtime_error("failed to find suitable memory type!");
     }
-    
+
+    // 多帧并发，创建指令缓冲
+    void createCommandBuffers() {
+        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = commandPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
+
+        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate command buffers!");
+        }
+    }
+
     // 记录指令缓冲
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
         VkCommandBufferBeginInfo beginInfo{};
@@ -1753,7 +1731,6 @@ private:
             if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
                 vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
                 vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
-
                 throw std::runtime_error("failed to create synchronization objects for a frame!");
             }
         }
@@ -1880,13 +1857,13 @@ private:
         // 1. 如果只有一个可用的表面格式，并且格式为VK_FORMAT_UNDEFINED，则表示所有格式都可用
         if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
             // 返回默认格式：BGRA8，SRGB_NONLINEAR
-            return {VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+            return {VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
         }
 
         // 2. 如果不是所有格式都可用，需要遍历所有可用的表面格式，选择最佳的格式
         for (const auto& availableFormat : availableFormats) {
             // 选择最佳的格式
-            if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && 
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && 
                 availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                 return availableFormat;
             }
