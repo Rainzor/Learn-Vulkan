@@ -100,10 +100,29 @@ add_src(14_command_buffers SHADER 09_shader_base)
 add_src(15_hello_triangle SHADER 09_shader_base)
 add_src(16_frames_in_flight SHADER 09_shader_base)
 add_src(17_swap_chain_recreation SHADER 09_shader_base)
+
 add_src(18_vertex_buffers SHADER 18_shader_vertexbuffer LIBS glm::glm)
+
 add_src(19_staging_buffer SHADER 18_shader_vertexbuffer LIBS glm::glm)
+
 add_src(20_index_buffer SHADER 18_shader_vertexbuffer LIBS glm::glm)
+
 add_src(20_index_buffer_plus SHADER 18_shader_vertexbuffer LIBS glm::glm)
+
 add_src(21_descriptor_sets SHADER 21_shader_ubo LIBS glm::glm)
-add_src(22_texture_mapping SHADER 22_shader_textures TEXTURES images/texture.jpg LIBS glm::glm)
-add_src(23_depth_buffering SHADER 23_shader_depth TEXTURES images/texture.jpg LIBS glm::glm)
+
+add_src(22_texture_mapping 
+        SHADER 22_shader_textures 
+        TEXTURES images/texture.jpg 
+        LIBS glm::glm)
+
+add_src(23_depth_buffering 
+        SHADER 23_shader_depth 
+        TEXTURES images/texture.jpg 
+        LIBS glm::glm)
+
+add_src(24_model_loading
+        SHADER 23_shader_depth
+        MODELS resources/viking_room.obj
+        TEXTURES resources/viking_room.png
+        LIBS glm::glm tinyobjloader::tinyobjloader)
