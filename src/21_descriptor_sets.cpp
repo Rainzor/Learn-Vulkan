@@ -311,7 +311,6 @@ private:
         createDescriptorSets();
 
         // 创建命令缓冲
-        // createCommandBuffer() ;
         createCommandBuffers();
 
         // 创建信号量
