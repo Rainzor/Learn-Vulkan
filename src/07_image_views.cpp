@@ -4,8 +4,6 @@
     *  - image views
     *   图像视图描述了访问图像的方式，以及图像的哪一部分可以被访问，用于描述如何将图像数据解释为纹理、渲染目标等
     *   
-    *   从Swapchain获取图像后，还不能直接在图像上进行绘制，需要将图像先包装为VkImageView和VkFramebuffer。
-    *   图像视图引用图像的特定部分，帧缓冲引用图像视图作为颜色，深度和模板目标。
     * 
     *   An image view is quite literally a view into an image. 
     *   It describes how to access the image and which part of the image to access, 
@@ -22,7 +20,27 @@
     * 
     *   Swapchain中可能有许多不同的图像，可以预先为每个图像都创建好图像视图和帧缓冲，然后在绘制时选择对应的视图或帧缓冲。
     * 
-    *   std::vector<VkImageView> swapChainImageViews
+    * Image: 是Vulkan中的一个基本对象，代表了图形内存中的一个图像资源。
+    *        Image可以是纹理、渲染目标或者其他任何形式的图像数据。
+    * 
+    * ImageView: 是对 Image 的一个视图或者说是一个接口，用来定义可以访问 Image 的哪一部分以及如何访问。
+    *           例如，你可以创建一个只看到图像的一部分或特定的mipmap层级的 ImageView。
+    *           它还可以定义图像数据的解释方式，比如是作为颜色数据还是深度数据。
+    * 
+    * ImageLayout:  指定了图像资源在内存中的布局形式，这关系到图像资源如何被管线访问。
+    *               例如，一个图像可以有 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL 布局，这意味着它被优化用作颜色附件。
+    *               布局的改变通常在渲染管线的各个阶段发生，以确保资源的正确使用。
+    * 
+    * Framebuffer: 是一个容器，用来持有用于渲染的图像附件，这些附件包括颜色、深度和模板缓冲区。
+    *              每一个附件都是通过 ImageView 来引用的。
+    *              因此，Framebuffer 定义了在一次渲染调用中所有需要的 ImageViews，以及它们各自的 ImageLayouts。
+    * 
+    * 这些组件共同工作，以确保图像数据可以有效且正确地被处理和呈现。
+    * 例如，当你进行渲染时，你会设置一个带有特定 ImageViews 和 ImageLayouts 的 Framebuffer，
+    * 管线状态会对应这些布局来正确访问图像数据。
+    * 这样的设计允许Vulkan提供高效率和控制精细度，但也要求开发者更明确地管理这些资源和状态。
+    * 
+    * std::vector<VkImageView> swapChainImageViews
 */
 
 #define GLFW_INCLUDE_VULKAN

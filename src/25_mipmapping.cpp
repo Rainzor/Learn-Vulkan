@@ -1,4 +1,17 @@
 /*
+    * Mipmap: 一种纹理映射技术，用于提高纹理质量
+    * VkImage holds the mipmap data, 
+    * VkSampler controls how that data is read while rendering. 
+    * 
+    * add: 
+    *   generateMipmaps()
+    * 
+    * modify:
+    *   createImage()
+    *   createImageView()
+    *   createTextureImage()
+    *   transitionImageLayout()
+    * 
 */
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -1075,8 +1088,12 @@ private:
                     stagingBuffer,
                     stagingBufferMemory);
 
+        //  Mipmaping:
+        //  由于现在有多个 mip 级别，但暂存缓冲区只能用于填充 mip 级别 0。其他级别仍然未定义。
+        //  为了填充这些级别，我们需要从我们拥有的单个级别生成数据，反复调用图像布局转换函数，
+        //  以便将每个级别转换为传输目标布局，然后将数据复制到该级别，然后将其转换为着色器只读布局。
 
-        //将图像数据拷贝到缓冲区
+        //  将图像数据拷贝到缓冲区
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
         memcpy(data, pixels, static_cast<size_t>(imageSize));
@@ -1084,43 +1101,42 @@ private:
 
         stbi_image_free(pixels);
 
-        //申请图像内存，指定图像用途格式
+        //  申请图像内存，指定图像用途格式
         createImage(texWidth,
                     texHeight,
                     mipLevels, 
                     VK_FORMAT_R8G8B8A8_SRGB, 
                     VK_IMAGE_TILING_OPTIMAL, 
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
                     textureImage, 
                     textureImageMemory);
 
-        //对image执行布局转换:从UNDEFINED转换为TRANSFER_DST_OPTIMAL
-        //只能被用作一个传输命令的一个目标图像
+        //  对image执行布局转换:从UNDEFINED转换为TRANSFER_DST_OPTIMAL
+        //  只能被用作一个传输命令的一个目标图像
+        //  将纹理图像的每个级别保留在 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL 中。 
+        //  后续blit 命令读取完成后，每个级别将转换为 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         transitionImageLayout(textureImage,
                             VK_FORMAT_R8G8B8A8_SRGB,
                             VK_IMAGE_LAYOUT_UNDEFINED, 
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,mipLevels);
-        //将缓冲区数据拷贝到图像句柄
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            mipLevels);
+        //  将缓冲区数据拷贝到图像句柄
         copyBufferToImage(stagingBuffer, 
                         textureImage, 
                         static_cast<uint32_t>(texWidth), 
                         static_cast<uint32_t>(texHeight));
-        //对image执行布局转换:从TRANSFER_DST_OPTIMAL转换为SHADER_READ_ONLY_OPTIMAL
-        //可以被着色器读取的最优布局
-        transitionImageLayout(textureImage, 
-                        VK_FORMAT_R8G8B8A8_SRGB, 
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        mipLevels);
-
-        //清理缓冲区
+        //  清理缓冲区
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+        //  生成mipmaps
+        generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
     }
 
     void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
         // Check if image format supports linear blitting
+        // 检查图像格式是否支持线性blitting
         VkFormatProperties formatProperties;
         vkGetPhysicalDeviceFormatProperties(physicalDevice, imageFormat, &formatProperties);
 
@@ -1144,12 +1160,14 @@ private:
         int32_t mipHeight = texHeight;
 
         for (uint32_t i = 1; i < mipLevels; i++) {
+            // 设置当前mipmap级别的barrier
             barrier.subresourceRange.baseMipLevel = i - 1;
+            // 指定转换前后的图像布局
             barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
             barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
+            // 在同步障下执行布局转换
             vkCmdPipelineBarrier(commandBuffer,
                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                 0, nullptr,
@@ -1157,19 +1175,26 @@ private:
                 1, &barrier);
 
             VkImageBlit blit{};
+            // srcOffsets[0]和srcOffsets[1]指定了源图像的起始和结束坐标
             blit.srcOffsets[0] = {0, 0, 0};
             blit.srcOffsets[1] = {mipWidth, mipHeight, 1};
             blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            blit.srcSubresource.mipLevel = i - 1;
+            blit.srcSubresource.mipLevel = i - 1;//源mipmap级别
             blit.srcSubresource.baseArrayLayer = 0;
             blit.srcSubresource.layerCount = 1;
+            // dstOffsets[0]和dstOffsets[1]指定了目标图像的起始和结束坐标
             blit.dstOffsets[0] = {0, 0, 0};
             blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
             blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            blit.dstSubresource.mipLevel = i;
+            blit.dstSubresource.mipLevel = i;//目标mipmap级别
             blit.dstSubresource.baseArrayLayer = 0;
             blit.dstSubresource.layerCount = 1;
 
+            // vkCmdBlitImage 命令执行复制、缩放和过滤操作
+            // VK_FILTER_LINEAR 指定了在缩放时使用线性过滤
+            // 指定了源和目标图像以及过滤器
+            // 注意， textureImage 用于 srcImage 和 dstImage 参数。
+            // 这是因为我们在同一图像的不同级别之间进行位块传输
             vkCmdBlitImage(commandBuffer,
                 image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -1180,7 +1205,7 @@ private:
             barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
+            // 将当前mipmap级别转换为着色器只读布局
             vkCmdPipelineBarrier(commandBuffer,
                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
                 0, nullptr,
@@ -1233,7 +1258,11 @@ private:
         //比较过滤操作
         samplerInfo.compareEnable = VK_FALSE;
         samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        //设置读取mipmap级别的方式
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
+        samplerInfo.mipLodBias = 0.0f;
 
         if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
             throw std::runtime_error("failed to create texture sampler!");
@@ -1837,7 +1866,8 @@ private:
         static auto startTime = std::chrono::high_resolution_clock::now();
 
         auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count()/3.0;
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+        time = 0.0f;
 
         UniformBufferObject ubo{};
         ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
