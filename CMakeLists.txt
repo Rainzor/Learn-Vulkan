@@ -132,3 +132,9 @@ add_src(25_mipmapping
         MODELS resources/viking_room.obj
         TEXTURES resources/viking_room.png
         LIBS glm::glm tinyobjloader::tinyobjloader)
+
+add_src(26_multisampling
+        SHADER 23_shader_depth
+        MODELS resources/viking_room.obj
+        TEXTURES resources/viking_room.png
+        LIBS glm::glm tinyobjloader::tinyobjloader)
