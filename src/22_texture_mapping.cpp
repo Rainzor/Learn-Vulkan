@@ -32,7 +32,7 @@
     * modify:
     *   createDescriptorSetLayout()
     *   createDescriptorPool()
-    *   createDescriptorSets()
+    !   createDescriptorSets()
     *   struct Vertex
 */
 #define GLFW_INCLUDE_VULKAN
@@ -731,7 +731,7 @@ private:
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;//颜色缓冲附着数量
-        subpass.pColorAttachments = &colorAttachmentRef;//对应 layout(location = 0) out vec4 outColor
+        subpass.pColorAttachments = &colorAttachmentRef;
 
         // Denpendencies:用于同步不同subpass之间的操作
          VkSubpassDependency dependency{};
@@ -761,6 +761,13 @@ private:
     
     // 创建描述符布局
     void createDescriptorSetLayout() {
+        /*
+            layout(binding = 0) uniform UniformBufferObject {
+                mat4 model;
+                mat4 view;
+                mat4 proj;
+            } ubo;
+        */
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;//绑定索引0
         uboLayoutBinding.descriptorCount = 1;
@@ -770,6 +777,9 @@ private:
         //在顶点着色器阶段使用
         uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+        /*
+            layout(binding = 1) uniform sampler2D texSampler;
+        */
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
         samplerLayoutBinding.binding = 1;//绑定索引1
         samplerLayoutBinding.descriptorCount = 1;
@@ -1154,12 +1164,6 @@ private:
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         viewInfo.format = format;
 
-        //    // 2. 配置图像通道
-        //     createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;//图像通道r
-        //     createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;//图像通道g
-        //     createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;//图像通道b
-        //     createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;//图像通道a
-
         // 配置图像子资源范围
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
@@ -1386,13 +1390,13 @@ private:
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers[i];
+            bufferInfo.buffer = uniformBuffers[i];//!uniform缓冲区
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = textureImageView;
+            imageInfo.imageView = textureImageView; //! 纹理图像视图
             imageInfo.sampler = textureSampler;
 
             std::array<VkWriteDescriptorSet, 2> descriptorWrites{};

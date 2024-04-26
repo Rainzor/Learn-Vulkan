@@ -1,6 +1,7 @@
 /*
     *   Framebuffers: 帧缓冲
     *   Framebuffers are the objects that represent a collection of memory attachments that can be rendered to.
+    *   帧缓冲区对象引用所有表示附件的 VkImageView 对象，这些附件将用于渲染操作。
     *   
     *   Framebuffer就是一段存储空间，其可以位于显存，也可以位于内存,用于存储渲染:颜色、深度、模板等数据
     *   
@@ -9,6 +10,10 @@
     *   FrameBuffer表示可用作附件(渲染目标)的实际图像的链接。
     *   通过指定RenderPass和一组Imageview创建一个Framebuffer对象。
     *   当然，它们的数量和格式必须与RenderPass的规范相匹配。
+    * 
+    *    帧缓冲区是存储图像渲染结果的一块内存区域。在渲染过程中，所有的绘图操作都是在帧缓冲区中进行的。
+    *   一旦所有渲染命令完成，帧缓冲区中的数据可以被送到显示设备上显示出来。
+    *   管理帧缓冲区可以让你控制渲染输出的目标，支持多目标渲染，后期处理等高级功能。
     * 
     *   Framebuffer是Image之上的另一层，基本上将这些Imageview组合在一起，以便在渲染特定RenderPass期间绑定为附件。
     *   每当开始渲染RernderPass时，调用函数vkCmdBeginRenderPass并将FrameBuffer传递给它。
@@ -710,6 +715,8 @@ private:
 
         //为每个交换链图像视图创建帧缓冲
         for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+            // FrameBuffer 是通过ImageView来引用attachment的
+            // 如果还有深度缓冲，也可以在这里引用
             VkImageView attachments[] = {
                 swapChainImageViews[i]
             };
@@ -718,7 +725,7 @@ private:
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             framebufferInfo.renderPass = renderPass;
             framebufferInfo.attachmentCount = 1;
-            framebufferInfo.pAttachments = attachments;//attachment 就是渲染流程中的交换链视图ImageViews
+            framebufferInfo.pAttachments = attachments;
             framebufferInfo.width = swapChainExtent.width;
             framebufferInfo.height = swapChainExtent.height;
             framebufferInfo.layers = 1;

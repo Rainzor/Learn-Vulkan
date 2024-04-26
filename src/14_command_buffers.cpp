@@ -778,8 +778,8 @@ private:
 
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderPass;
-        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+        renderPassInfo.renderPass = renderPass;//配置RenderPass,获取对颜色附件的使用方式
+        renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];//配置Framebuffer，获取当前ImageIndex 所有的附件
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = swapChainExtent;
 

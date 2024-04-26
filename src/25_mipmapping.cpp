@@ -751,7 +751,7 @@ private:
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;//颜色缓冲附着数量
-        subpass.pColorAttachments = &colorAttachmentRef;//对应 layout(location = 0) out vec4 outColor
+        subpass.pColorAttachments = &colorAttachmentRef;//颜色缓冲附着  
         subpass.pDepthStencilAttachment = &depthAttachmentRef;//深度缓冲附着
 
         // Denpendencies:用于同步不同subpass之间的操作
@@ -1258,7 +1258,7 @@ private:
         //比较过滤操作
         samplerInfo.compareEnable = VK_FALSE;
         samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        //设置读取mipmap级别的方式
+        //! 设置读取mipmap级别的方式
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = VK_LOD_CLAMP_NONE;

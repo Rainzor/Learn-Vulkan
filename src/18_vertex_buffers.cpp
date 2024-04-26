@@ -23,10 +23,11 @@
     * 6.  Draw
     * 
     * add:
-    *   Strcut Vertex: 用来描述顶点数据
+    !   Strcut Vertex: 用来描述顶点数据
     *   createVertexBuffer(): 创建顶点缓冲区
     * modify:
     *   createGraphicsPipeline()
+    *   recordCommandBuffer()
     *   
     * 
     * 
@@ -129,6 +130,10 @@ struct Vertex {
     }
     //用来描述如何处理每个顶点数据
     static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
+        /*
+            layout(location = 0) in vec2 inPosition;
+            layout(location = 1) in vec3 inColor;
+        */
         std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
         //The binding parameter tells Vulkan from which binding the per-vertex data comes.
         attributeDescriptions[0].binding = 0;
@@ -1029,7 +1034,7 @@ private:
         //instanceCount：指定实例数量
         //firstVertex：指定顶点偏移量
         //firstInstance：指定实例偏移量
-        // vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+        // ! vkCmdDraw(commandBuffer, 3, 1, 0, 0);
         VkBuffer vertexBuffers[] = {vertexBuffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);

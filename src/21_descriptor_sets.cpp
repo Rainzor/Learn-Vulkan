@@ -27,11 +27,11 @@
     * uniformBuffers的大小要与swapChainImages的大小一致，因为每个swapChainImage都需要一个uniformBuffer，防止前一帧的uniformBuffer被下一帧使用
     * 
     * add:
-    *   createDescriptorSetLayout()
+    !   createDescriptorSetLayout()
     *   createUniformBuffers()
     *   updateUniformBuffer()
     *   createDescriptorPool()
-    *   createDescriptorSets()
+    !   createDescriptorSets()
     *   
     * modify:
     *   createGraphicsPipeline()
@@ -755,6 +755,13 @@ private:
 
     }
     void createDescriptorSetLayout() {
+        /* shader.vert
+            layout(binding = 0) uniform UniformBufferObject {
+                mat4 model;
+                mat4 view;
+                mat4 proj;
+            } ubo;
+        */
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorCount = 1;
@@ -895,7 +902,7 @@ private:
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;//描述符集布局
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;//描述符集布局，用于指定uniform值
 
         // 13. 创建管线布局
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
@@ -1103,7 +1110,7 @@ private:
         //update descriptor sets
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers[i];//实际的uniform缓冲区
+            bufferInfo.buffer = uniformBuffers[i];//! 实际的uniform缓冲区
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
 

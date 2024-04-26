@@ -19,8 +19,8 @@
     *   struct Vertex
     *   createImageViews()
     *   transitionImageLayout()
-    *   createRenderPass()
-    *   createFramebuffers()
+    !   createRenderPass()
+    !   createFramebuffers()
     *   createGraphicsPipeline()
 */
 #define GLFW_INCLUDE_VULKAN
@@ -709,7 +709,6 @@ private:
         swapChainExtent = extent;//交换链图像分辨率
     }
     
-
     //创建交换链内图像视图
     void createImageViews() {
         //配置交换链图像视图信息
@@ -736,11 +735,11 @@ private:
         depthAttachment.format = findDepthFormat();
         depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
         depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;// DONT_CARE
         depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;//指定渲染后深度图像的布局：深度缓冲附着
 
         //子流程:用于引用多个/一个attachment，处理attachment的内容
         VkAttachmentReference colorAttachmentRef{};
@@ -895,12 +894,12 @@ private:
         multisampling.alphaToCoverageEnable = VK_FALSE;
         multisampling.alphaToOneEnable = VK_FALSE;
 
-        // 10. 配置深度模板信息
+        // ! 10. 配置深度模板信息
         VkPipelineDepthStencilStateCreateInfo depthStencil{};
         depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
         depthStencil.depthTestEnable = VK_TRUE;
         depthStencil.depthWriteEnable = VK_TRUE;
-        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;//深度比较操作模式
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;//! 深度比较操作模式
         depthStencil.depthBoundsTestEnable = VK_FALSE;
         depthStencil.stencilTestEnable = VK_FALSE;
 
@@ -986,6 +985,7 @@ private:
 
         //为每个交换链图像视图创建帧缓冲
         for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+            //! 附件：颜色附着和深度附着
             std::array<VkImageView, 2> attachments = {
                 swapChainImageViews[i],
                 depthImageView

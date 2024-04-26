@@ -2,7 +2,9 @@
     * Vulkan Tutorial (https://vulkan-tutorial.com/)
     *
     *  - image views
-    *   图像视图描述了访问图像的方式，以及图像的哪一部分可以被访问，用于描述如何将图像数据解释为纹理、渲染目标等
+    *   要使用任何 VkImage ，必须在渲染管道中创建一个 VkImageView 对象。
+    *   图像视图描述了访问图像的方式，以及图像的哪一部分可以被访问(mipmap级别，左右眼图像层级等)。
+    *   用于描述如何将图像数据解释为颜色、深度目标, 格式 RGBA, DEPTH24_STENCIL8 等。
     *   
     * 
     *   An image view is quite literally a view into an image. 
@@ -41,6 +43,7 @@
     * 这样的设计允许Vulkan提供高效率和控制精细度，但也要求开发者更明确地管理这些资源和状态。
     * 
     * std::vector<VkImageView> swapChainImageViews
+    * createImageViews()
 */
 
 #define GLFW_INCLUDE_VULKAN

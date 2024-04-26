@@ -509,7 +509,7 @@ private:
         }
     }
 
-    // 创建渲染通道
+    // 创建渲染通道：提前描述交换链图像的使用方式
     void createRenderPass() {
         //颜色缓冲attachment资源的描述
         VkAttachmentDescription colorAttachment{};
@@ -519,17 +519,40 @@ private:
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;//指定渲染后对颜色缓冲的操作：存储
         colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        /* 常见的layout:
+            VK_IMAGE_LAYOUT_UNDEFINED ：图像数据不受限制，可以被任意操作
+            VK_IMAGE_LAYOUT_PREINITIALIZED ：图像数据已经被初始化，可以被主机写入
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL ：图像数据可以被用作颜色附着
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL ：图像数据可以被用作深度/模板附着
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL ：图像数据可以被用作深度/模板附着，且只能读取
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL：图像数据可以被着色器读取
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ：图像数据可以作为传输操作的源图像
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL ：图像数据可以作为传输操作的目标图像
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ：图像数据作为呈现操作的源图像           
+        */
+
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;//指定渲染前图像的布局：未定义
         colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;//指定渲染后图像的布局：呈现
 
-        //子流程:用于引用多个/一个attachment，处理attachment的内容
+        // subpass: 用于引用多个/一个attachment，处理attachment的内容
+        /*  常见的Attachment:
+            pColorAttachments : 颜色附着
+            pDepthStencilAttachment : 深度/模板附着
+            pResolveAttachments : 多重采样附着
+            pInputAttachments : 从着色器读取的附着
+            pPreserveAttachments : 此子通道不使用但必须保留数据的附着
+        */
+        // 单个渲染通道可以包含多个子通道。
+        // 子通道是后续渲染操作，依赖于先前通道中帧缓冲区的内容，例如依次应用的一系列后处理效果。
+        // 如果将这些渲染操作分组到一个渲染通道中，则 Vulkan 能够对操作重新排序并节省内存带宽，从而可能获得更好的性能
         VkAttachmentReference colorAttachmentRef{};
         colorAttachmentRef.attachment = 0;//指定颜色缓冲附着的索引
         colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         VkSubpassDescription subpass{};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;//颜色缓冲附着数量
-        subpass.pColorAttachments = &colorAttachmentRef;//对应 layout(location = 0) out vec4 outColor
+        subpass.pColorAttachments = &colorAttachmentRef;
 
         //renderPass 创建
         VkRenderPassCreateInfo renderPassInfo{};

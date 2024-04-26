@@ -17,6 +17,10 @@
     10. Draw frames by acquiring images, submitting the right draw command buffer and 
         returning the images back to the swap chain for presentation
 
+    add:
+        createSyncObjects()
+        drawFrame()
+
     
 */
 #define GLFW_INCLUDE_VULKAN
@@ -785,7 +789,7 @@ private:
         }
     }
     
-    // 记录指令缓冲
+    // 记录指令缓冲: 配置渲染时的各个指定顺序
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -869,6 +873,7 @@ private:
     }
     
     // 绘制一帧!!!!!!!!!
+    // 从更加高维的角度配置渲染：绘制与呈现之间的同步顺序
     void drawFrame() {
         // 1. 等待上一帧渲染结束
         vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);

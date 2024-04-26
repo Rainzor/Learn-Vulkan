@@ -1,15 +1,16 @@
 /*
     * Vulkan Tutorial (https://vulkan-tutorial.com/)
     *   
-    *   交换链是渲染目标的集合。
+    *   交换链是渲染目标的集合，本质上是一个等待呈现到屏幕上的图像队列
     *   它最基本的作用就是确保现在正在渲染的图像与现在显示在屏幕上的图像不是同一个。
+    *   createInfo.surface = surface 与实际桌面屏幕渲染结果建立连接
+    * 
+    *   我们的应用程序将从队列中获取图像来绘制它，然后将其返回队列中等待呈现。
+    *   队列究竟如何工作以及从队列中呈现图像的条件取决于交换链的设置方式，但交换链的一般用途是将图像的呈现与屏幕的刷新率同步。
     * 
     *   它是一种管理渲染到屏幕的帧缓冲区的机制。它通常包含多个帧缓冲区，
     *   这些缓冲区在渲染和显示之间循环使用。这种机制的目的是减少等待时间和提高渲染效率
     * 
-    *   帧缓冲区是存储图像渲染结果的一块内存区域。在渲染过程中，所有的绘图操作都是在帧缓冲区中进行的。
-    *   一旦所有渲染命令完成，帧缓冲区中的数据可以被送到显示设备上显示出来。
-    *   管理帧缓冲区可以让你控制渲染输出的目标，支持多目标渲染，后期处理等高级功能。
     * 
     * 
     *   - 图像资源：存储实际像素数据的底层对象。
@@ -34,6 +35,13 @@
     *   Its basic purpose is to ensure that the image that we're currently
     *   rendering to is different from the one that is currently on the screen.
     *   This is important to make sure that only complete images are shown.
+    * 
+    *   add:
+    *       createSwapChain()
+    *       chooseSwapSurfaceFormat()
+    *       chooseSwapPresentMode()
+    *       chooseSwapExtent()
+    *       querySwapChainSupport()
     * 
 */
 
@@ -129,7 +137,7 @@ private:
     VkQueue presentQueue;//呈现队列句柄
 
     VkSwapchainKHR swapChain;//交换链句柄
-    std::vector<VkImage> swapChainImages;//交换链图像
+    std::vector<VkImage> swapChainImages;//交换链图像, VkImage图像对象
     VkFormat swapChainImageFormat;//交换链图像格式
     VkExtent2D swapChainExtent;//交换链图像分辨率
 
@@ -381,7 +389,7 @@ private:
 
     // 创建交换链与选择交换链图像格式
     // 表面格式：像素格式、颜色空间、深度
-    // 呈现模式：显示图像到屏幕的条件
+    // 呈现模式：显示图像到屏幕的条件(最重要的设置)
     // 交换范围：交换链图像的分辨率
     void createSwapChain() {
         // 1. 获取交换链支持信息
@@ -406,7 +414,7 @@ private:
         // 6. 配置交换链信息
         VkSwapchainCreateInfoKHR createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;//交换链信息
-        createInfo.surface = surface;//表面句柄
+        createInfo.surface = surface;//与实际桌面屏幕渲染结果建立连接
 
         createInfo.minImageCount = imageCount;//交换链图像数量
         createInfo.imageFormat = surfaceFormat.format;//交换链图像格式
@@ -450,6 +458,7 @@ private:
         }
 
         // 10. 获取交换链图像句柄
+        //这些图像是由交换链的实现创建的，一旦交换链被销毁，它们将被自动清理
         vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);//获取交换链图像数量
         swapChainImages.resize(imageCount);//交换链图像
         vkGetSwapchainImagesKHR(device, swapChain, &imageCount, 

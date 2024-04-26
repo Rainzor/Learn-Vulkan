@@ -741,7 +741,7 @@ private:
         colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;//指定渲染后图像的布局：颜色附着
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;//指定渲染后采样图像的布局：颜色附着
 
         // 深度附着
         VkAttachmentDescription depthAttachment{};
@@ -752,9 +752,9 @@ private:
         depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;//指定渲染后图像的布局：深度附着
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;//指定渲染后深度图像的布局：深度附着
 
-        //颜色呈现
+        // 颜色呈现
         VkAttachmentDescription colorAttachmentResolve{};
         colorAttachmentResolve.format = swapChainImageFormat;
         colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;

@@ -11,6 +11,20 @@
     * 
     * 以及可编程部分，使用VkShaderModule对象来描述。VkShaderModule对象使用着色器的字节码来创建。
     * 驱动还需要知道管线中的哪些渲染目标会被使用，这些渲染目标由通过引用render passes来指定。
+    * 
+    * 管道建立的大致步骤：
+    * 
+    * Shader stages: the shader modules that define the functionality of the programmable stages of the graphics pipeline
+    * 着色器：定义图形管道的可编程阶段的功能的着色器模块
+    * 
+    * Fixed-function state: all of the structures that define the fixed-function stages of the pipeline, like input assembly, rasterizer, viewport and color blending
+    * 固定管线：定义管道固定功能阶段的所有结构，例如输入组件、光栅化器、视口和颜色混合
+    * 
+    * Pipeline layout: the uniform and push values referenced by the shader that can be updated at draw time
+    * 管道布局：着色器引用的uniform和推送值，可以在绘制时更新
+    * 
+    * Render pass: the attachments referenced by the pipeline stages and their usage
+    * 渲染通道：管道阶段引用的附件及其用法
 */
 
 #define GLFW_INCLUDE_VULKAN
@@ -655,16 +669,16 @@ private:
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.stageCount = 2;
-        pipelineInfo.pStages = shaderStages;
-        pipelineInfo.pVertexInputState = &vertexInputInfo;
-        pipelineInfo.pInputAssemblyState = &inputAssembly;
-        pipelineInfo.pViewportState = &viewportState;
-        pipelineInfo.pRasterizationState = &rasterizer;
-        pipelineInfo.pMultisampleState = &multisampling;
-        pipelineInfo.pColorBlendState = &colorBlending;
-        pipelineInfo.pDynamicState = &dynamicState;
-        pipelineInfo.layout = pipelineLayout;
-        pipelineInfo.renderPass = renderPass;//渲染流程
+        pipelineInfo.pStages = shaderStages;//着色器阶段内容
+        pipelineInfo.pVertexInputState = &vertexInputInfo;//顶点输入信息
+        pipelineInfo.pInputAssemblyState = &inputAssembly;//输入汇总信息
+        pipelineInfo.pViewportState = &viewportState;//视口信息
+        pipelineInfo.pRasterizationState = &rasterizer;//光栅化信息
+        pipelineInfo.pMultisampleState = &multisampling;//多重采样
+        pipelineInfo.pColorBlendState = &colorBlending;//颜色混合方式
+        pipelineInfo.pDynamicState = &dynamicState;//动态状态
+        pipelineInfo.layout = pipelineLayout;//管线布局
+        pipelineInfo.renderPass = renderPass;//renderPass 指定了渲染时各个附件的加载和存储操作
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 

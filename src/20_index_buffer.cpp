@@ -1095,7 +1095,7 @@ private:
         // vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
     
-        //vkCmdDrawIndexed 参数：
+        //! vkCmdDrawIndexed 参数：
         //commandBuffer：指定要记录的指令缓冲
         //indexCount：绘制的索引数量
         //instanceCount：实例数量
