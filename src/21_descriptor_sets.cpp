@@ -21,10 +21,13 @@
     * 这个layout将这个资源的蓝图进行描述，不牵扯到其具体的数据信息。这个layout蓝图，将会分配给pipeline object(游戏机)，
     * 使得后期对资源进行绑定的时候，可以正确的将资源插入到对应的插槽中。
     * 
+    * Descriptor pool -- 管理 Descriptor Set 的分配和释放
+    * Descriptor layout -- 记录了一种描述符的蓝图，但是并没有指向任何有效的资源位置,支持动态更新资源
     * Descriptor set -- 记录对应资源蓝图的资源具体位置以及对资源进行汇总
-    * Descriptor layout -- 记录了一种描述符的蓝图，但是他并没有指向任何有效的资源位置
     * 
-    * uniformBuffers的大小要与swapChainImages的大小一致，因为每个swapChainImage都需要一个uniformBuffer，防止前一帧的uniformBuffer被下一帧使用
+    * uniformBuffers的大小要与swapChainImages的大小一致，
+    * 因为每个swapChainImage都需要一个uniformBuffer，
+    * 防止前一帧的uniformBuffer被下一帧使用
     * 
     * add:
     !   createDescriptorSetLayout()
@@ -762,6 +765,7 @@ private:
                 mat4 proj;
             } ubo;
         */
+       //! 指定描述符类型绑定的着色器阶段和绑定点
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorCount = 1;
@@ -902,7 +906,7 @@ private:
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;//描述符集布局，用于指定uniform值
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;//! 描述符集布局，用于指定uniform值
 
         // 13. 创建管线布局
         if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
@@ -1074,6 +1078,7 @@ private:
     }
 
     void createDescriptorPool() {
+        //! 分配描述符类型及个数、描述符集数量
         VkDescriptorPoolSize poolSize{};
         //VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER：uniform缓冲区
         poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1096,9 +1101,9 @@ private:
         std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorPool = descriptorPool;//描述符池
         allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-        allocInfo.pSetLayouts = layouts.data();
+        allocInfo.pSetLayouts = layouts.data();//描述符集布局
         //we will create one descriptor set for each frame in flight, all with the same layout
         descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1110,22 +1115,24 @@ private:
         //update descriptor sets
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers[i];//! 实际的uniform缓冲区
+            bufferInfo.buffer = uniformBuffers[i];//! 实际的uniform缓冲区资源位置
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
 
+            //! 将描述符类型、绑定点及描述符内存信息写入由pool和layout创建的描述符集
             VkWriteDescriptorSet descriptorWrite{};
             descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrite.dstSet = descriptorSets[i];
-            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstBinding = 0;//layout中的binding
             descriptorWrite.dstArrayElement = 0;//not an array
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;//描述符类型
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.pBufferInfo = &bufferInfo;
             //其他可使用的资源
             descriptorWrite.pImageInfo = nullptr;//optional 
             descriptorWrite.pTexelBufferView = nullptr;//optional
 
+            // 更新描述符集，将描述符绑定到实际资源
             vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
         }
     }
@@ -1269,7 +1276,9 @@ private:
         // vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-        //绑定描述符集：使用描述符集来更新着色器中的uniform值
+        //! 绑定描述符集：vkCmdBindDescriptorSets
+        //使用描述符集来更新着色器中的uniform值
+        //指定哪些 Descriptor Set 应该被绑定到当前的渲染管线
         //descriptorSets 中指定的描述符集将绑定到指定的管线布局的指定绑定点
         //参数：
         //commandBuffer：指定要记录的指令缓冲
@@ -1361,7 +1370,7 @@ private:
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
-        // 更新uniform缓冲区
+        //! 更新uniform缓冲区,动态更新资源
         updateUniformBuffer(currentFrame);
 
         // 3. 重置上一帧渲染结束的标志位
