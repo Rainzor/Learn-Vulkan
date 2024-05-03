@@ -900,7 +900,7 @@ private:
         dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
         dynamicState.pDynamicStates = dynamicStates.data();
 
-        // 12. 配置管线布局信息
+        //! 12. 配置管线布局信息
         // 配置一些uniform值，它们可以在着色器中使用
         // uniform值是在绘制过程中可以改变的值,它们可以用来传递变换矩阵和纹理采样器
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -1376,7 +1376,7 @@ private:
         // 3. 重置上一帧渲染结束的标志位
         // Only reset the fence if we are submitting work
         vkResetFences(device, 1, &inFlightFences[currentFrame]);
-        // 4.记录指令缓冲
+        // 4. 执行一系列资源绑定和渲染操作
         vkResetCommandBuffer(commandBuffers[currentFrame],  0);
         recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 
